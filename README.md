@@ -16,7 +16,9 @@ Care RAG API 是一個基於 FastAPI 的企業級 RAG 系統，提供 GraphRAG �
 - 📊 **Prometheus 指標** - 完整的監控指標（請求/查詢/快取/WebSocket）
 - 🔐 **API Key 驗證** - 安全認證機制
 - 📄 **文件管理** - 文件新增、刪除、批量處理 API
+- 📚 **知識庫管理** - 知識攝取、查詢、來源管理
 - 🏥 **健康檢查** - 三層健康檢查（health/ready/live）
+- 🔧 **管理端點** - 系統統計、圖資料庫統計、快取管理
 - 🐳 **Docker 支援** - 完整容器化部署（API + Redis）
 - 🧪 **測試覆蓋** - 13 個測試案例（REST/SSE/WebSocket）
 
@@ -40,7 +42,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-**注意**：預設端口為 8000（實際運行端口），而非配置文件的 8080。
+**注意**：預設端口為 8000，配置文件中的 `PORT` 也設定為 8000，保持一致。
 
 3. **使用 Docker 啟動**
 ```bash
@@ -59,6 +61,16 @@ docker-compose up --build
 - `POST /api/v1/documents` - 新增單一文件
 - `POST /api/v1/documents/batch` - 批量新增文件
 - `DELETE /api/v1/documents/{id}` - 刪除文件
+
+**知識庫：**
+- `POST /api/v1/knowledge/query` - 知識庫查詢（包含圖結構資訊）
+- `GET /api/v1/knowledge/sources` - 取得知識來源列表
+- `POST /api/v1/knowledge/ingest` - 知識庫攝取
+
+**管理端點（需要 API Key）：**
+- `GET /api/v1/admin/stats` - 系統統計資訊
+- `GET /api/v1/admin/graph/stats` - 圖資料庫統計資訊
+- `POST /api/v1/admin/cache/clear` - 清除快取
 
 **健康檢查：**
 - `GET /` - 根端點
@@ -103,9 +115,42 @@ curl -X POST "http://localhost:8000/api/v1/query" \
   -d '{"query": "你的問題", "provider": "openai", "top_k": 5}'
 ```
 
+**知識庫查詢（包含圖結構）：**
+```bash
+curl -X POST "http://localhost:8000/api/v1/knowledge/query" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "什麼是長期照護2.0？",
+    "top_k": 3,
+    "include_graph": true
+  }'
+```
+
+**取得知識來源列表：**
+```bash
+curl -X GET "http://localhost:8000/api/v1/knowledge/sources"
+```
+
+**知識庫攝取：**
+```bash
+curl -X POST "http://localhost:8000/api/v1/knowledge/ingest" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "這是知識內容...",
+    "source": "api",
+    "metadata": {"title": "知識範例"}
+  }'
+```
+
+**系統統計（需要 API Key）：**
+```bash
+curl -X GET "http://localhost:8000/api/v1/admin/stats" \
+  -H "X-API-Key: test-api-key"
+```
+
 **完整 API 查詢範例**：
 - 📖 [API 查詢範例文檔](docs/api_query_examples.md) - 包含 12+ 個 REST API 範例、SSE 串流、WebSocket 查詢範例
-- 📬 [Postman 集合](docs/postman/Care_RAG_API.postman_collection.json) - 可直接導入 Postman 使用的完整測試集合
+- 📬 [Postman 集合](docs/postman/README.md) - Postman 使用指南和完整測試集合
 
 ## 專案結構
 
@@ -131,6 +176,9 @@ care_rag_api/
 │   │   │   ├── query.py           # 查詢端點（REST/SSE/WS）
 │   │   │   ├── documents.py       # 文件管理
 │   │   │   ├── health.py          # 健康檢查
+│   │   │   ├── knowledge.py       # 知識庫端點
+│   │   │   ├── admin.py           # 管理端點
+│   │   │   ├── webhook.py         # Webhook 端點
 │   │   │   └── websocket.py       # WebSocket 端點
 │   │   └── schemas/               # 結構定義
 │   │       ├── query.py           # 查詢結構
@@ -143,7 +191,10 @@ care_rag_api/
 │   ├── init_graph_db.py           # GraphRAG 資料庫初始化
 │   ├── load_documents.py          # 文件載入腳本
 │   ├── process_pdf_to_graph.py   # PDF 處理和圖構建腳本
-│   └── reset_graph_db.py          # 重置資料庫腳本
+│   ├── reset_graph_db.py          # 重置資料庫腳本
+│   ├── check_db.py                # 資料庫檢查腳本
+│   ├── test_health_api.ps1        # 健康檢查 API 測試腳本（PowerShell）
+│   └── test_health_api.sh         # 健康檢查 API 測試腳本（Bash）
 ├── tests/                         # 測試檔案
 │   └── test_api/                  # API 測試
 │       ├── test_query.py          # REST API 測試
@@ -282,6 +333,7 @@ API_KEY=your-api-key-here
 
 **不需要 API Key：**
 - 所有查詢端點（`/api/v1/query`）
+- 所有知識庫端點（`/api/v1/knowledge`）
 - 所有文件管理端點（`/api/v1/documents`）
 - 所有健康檢查端點（`/api/v1/health`）
 
@@ -312,6 +364,14 @@ A: 只有管理端點（Admin）需要 API Key，查詢和文件管理端點不�
 **Q: 資料庫文件在哪裡？**
 
 A: 預設位置為 `./data/graph.db`，可在 `app/config.py` 中修改 `GRAPH_DB_PATH`。
+
+**Q: 為什麼 `/api/v1/knowledge/sources` 返回空列表？**
+
+A: 這表示還沒有處理任何 PDF 文件或攝取知識。請先使用 `scripts/process_pdf_to_graph.py` 處理 PDF 文件，或使用 `/api/v1/knowledge/ingest` 端點攝取知識內容。
+
+**Q: 如何查看已處理的文件來源？**
+
+A: 使用 `GET /api/v1/knowledge/sources` 端點，它會從 GraphStore 中獲取所有 Document 類型的實體作為知識來源。
 
 更多詳細說明請參閱 [QA 文檔](docs/qa/README.md)
 

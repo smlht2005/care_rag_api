@@ -52,4 +52,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Database files
+*.db
+data/graph.db
 

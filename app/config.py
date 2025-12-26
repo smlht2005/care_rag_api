@@ -1,5 +1,8 @@
 """
 應用程式配置檔案
+更新時間：2025-12-26 18:18
+作者：AI Assistant
+修改摘要：修正 PORT 預設值從 8080 改為 8000，與 uvicorn 預設端口和實際運行端口保持一致
 更新時間：2025-12-26 15:00
 作者：AI Assistant
 修改摘要：簡化配置，移除 GEMINI_API_KEY 和 GOOGLE_CLOUD_PROJECT，統一使用 GOOGLE_API_KEY，添加 load_dotenv() 確保環境變數載入
@@ -30,7 +33,7 @@ class Settings(BaseSettings):
     
     # 伺服器設定
     HOST: str = "0.0.0.0"
-    PORT: int = 8080
+    PORT: int = 8000  # 預設端口 8000（與 uvicorn 預設一致）
     DEBUG: bool = False
     
     # CORS 設定
