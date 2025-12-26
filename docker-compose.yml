@@ -1,0 +1,47 @@
+version: '3.9'
+
+services:
+  api:
+    build: .
+    container_name: care_rag_api
+    ports:
+      - "8080:8080"  # API 端口
+      - "8001:8001"  # Prometheus 指標端口
+    environment:
+      - DEBUG=false
+      - LLM_PROVIDER=gemini
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - METRICS_PORT=8001
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - care_rag_network
+
+  # Redis 服務（可選，目前使用 stub）
+  redis:
+    image: redis:7-alpine
+    container_name: care_rag_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - care_rag_network
+    command: redis-server --appendonly yes
+
+networks:
+  care_rag_network:
+    driver: bridge
+
+volumes:
+  redis_data:
+

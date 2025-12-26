@@ -1,0 +1,461 @@
+{
+	"info": {
+		"_postman_id": "care-rag-api-collection",
+		"name": "Care RAG API",
+		"description": "完整的 Care RAG API 測試集合，包含所有 REST API 端點",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "care-rag-api"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/health",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "health"]
+						},
+						"description": "基本健康檢查端點"
+					},
+					"response": []
+				},
+				{
+					"name": "Readiness Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/health/ready",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "health", "ready"]
+						},
+						"description": "就緒檢查端點"
+					},
+					"response": []
+				},
+				{
+					"name": "Liveness Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/health/live",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "health", "live"]
+						},
+						"description": "存活檢查端點"
+					},
+					"response": []
+				}
+			],
+			"description": "健康檢查相關端點"
+		},
+		{
+			"name": "Query",
+			"item": [
+				{
+					"name": "REST Query - 長期照護",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"什麼是長期照護2.0？\",\n  \"top_k\": 3,\n  \"provider\": \"gemini\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/query",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "query"]
+						},
+						"description": "查詢長期照護相關內容"
+					},
+					"response": []
+				},
+				{
+					"name": "REST Query - World Health Organization",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"World Health Organization 在長期照護方面有什麼政策？\",\n  \"top_k\": 5\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/query",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "query"]
+						},
+						"description": "查詢 WHO 相關政策"
+					},
+					"response": []
+				},
+				{
+					"name": "REST Query - 政策和組織關係",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"哪些組織實施了長期照護政策？\",\n  \"top_k\": 3\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/query",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "query"]
+						},
+						"description": "查詢政策和組織關係"
+					},
+					"response": []
+				},
+				{
+					"name": "REST Query - 自訂參數",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"請詳細說明長期照護2.0的實施策略\",\n  \"top_k\": 5,\n  \"max_tokens\": 3000,\n  \"temperature\": 0.7\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/query",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "query"]
+						},
+						"description": "使用自訂參數的查詢"
+					},
+					"response": []
+				},
+				{
+					"name": "SSE Stream Query",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/query/stream?query=什麼是長期照護2.0？",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "query", "stream"],
+							"query": [
+								{
+									"key": "query",
+									"value": "什麼是長期照護2.0？"
+								}
+							]
+						},
+						"description": "SSE 串流查詢端點"
+					},
+					"response": []
+				}
+			],
+			"description": "查詢相關端點"
+		},
+		{
+			"name": "Documents",
+			"item": [
+				{
+					"name": "Add Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"content\": \"這是文件內容範例...\",\n  \"metadata\": {\n    \"title\": \"範例文件\",\n    \"author\": \"AI Assistant\"\n  },\n  \"source\": \"example.pdf\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/documents",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "documents"]
+						},
+						"description": "新增單一文件"
+					},
+					"response": []
+				},
+				{
+					"name": "Batch Add Documents",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"documents\": [\n    {\n      \"content\": \"文件1內容...\",\n      \"source\": \"doc1.pdf\"\n    },\n    {\n      \"content\": \"文件2內容...\",\n      \"source\": \"doc2.pdf\"\n    }\n  ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/documents/batch",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "documents", "batch"]
+						},
+						"description": "批量新增文件"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Document",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/documents/{document_id}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "documents", "{document_id}"],
+							"variable": [
+								{
+									"key": "document_id",
+									"value": "doc_1051219長期照護2.0核定本_5d9487f8",
+									"description": "文件 ID"
+								}
+							]
+						},
+						"description": "刪除文件"
+					},
+					"response": []
+				}
+			],
+			"description": "文件管理相關端點"
+		},
+		{
+			"name": "Knowledge",
+			"item": [
+				{
+					"name": "Knowledge Query",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"什麼是長期照護2.0？\",\n  \"top_k\": 3,\n  \"include_graph\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/knowledge/query",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "knowledge", "query"]
+						},
+						"description": "知識庫查詢端點（包含圖結構資訊）"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Knowledge Sources",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/knowledge/sources",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "knowledge", "sources"]
+						},
+						"description": "取得知識來源列表"
+					},
+					"response": []
+				},
+				{
+					"name": "Ingest Knowledge",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"content\": \"這是知識內容...\",\n  \"source\": \"api\",\n  \"metadata\": {\n    \"title\": \"知識範例\"\n  },\n  \"entity_types\": [\"Concept\", \"Organization\"]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/knowledge/ingest",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "knowledge", "ingest"]
+						},
+						"description": "知識庫攝取端點"
+					},
+					"response": []
+				}
+			],
+			"description": "知識庫相關端點"
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "Get System Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/admin/stats",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "admin", "stats"]
+						},
+						"description": "取得系統統計資訊（需要 API Key）"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Graph Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/admin/graph/stats",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "admin", "graph", "stats"]
+						},
+						"description": "取得圖資料庫統計資訊（需要 API Key）"
+					},
+					"response": []
+				},
+				{
+					"name": "Clear Cache",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/admin/cache/clear",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "admin", "cache", "clear"]
+						},
+						"description": "清除快取（需要 API Key）"
+					},
+					"response": []
+				}
+			],
+			"description": "管理相關端點（需要 API Key）"
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "api_key",
+			"value": "test-api-key",
+			"type": "string"
+		}
+	]
+}
+
