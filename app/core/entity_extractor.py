@@ -1,6 +1,28 @@
 """
 實體和關係提取器
 使用 LLM 從文字中提取實體和關係
+
+更新時間：2026-03-11 09:13
+作者：AI Assistant
+修改摘要：[Fix B] 重寫 _rule_based_entity_extraction() 中文分段邏輯：改用標點邊界切段（split by 標點/空白）取代原 r'[\u4e00-\u9fff]{2,6}' 6-char 滑動視窗，消除截斷詞語的垃圾實體；最小長度 3 字、最大 12 字
+更新時間：2026-03-09 20:55
+作者：AI Assistant
+修改摘要：修正 2 open/1 close 誤判：以括號配對擷取陣列（跳過字串內 ] 如 \"[02]\"），並在括號不匹配時用該法重取再修復
+更新時間：2026-03-09 20:45
+作者：AI Assistant
+修改摘要：放寬實體解析：接受 description/code/label/title 作為實體名稱（對照表/IC 檔等 LLM 常回傳此類欄位），減少「LLM entity extraction returned empty」
+更新時間：2026-03-09 20:25
+作者：AI Assistant
+修改摘要：加強不完整 JSON 修復：先試補 ]，再試補 }+]，並 strip 尾端逗號，以處理截斷在最後一個物件內的情況（2 open / 1 close）
+更新時間：2026-03-09 20:15
+作者：AI Assistant
+修改摘要：LLM 回傳 JSON 括號不完整時（如截斷）嘗試修復：補齊缺少的 ] 後再解析，成功則沿用 LLM 結果，失敗再降級 rule-based
+更新時間：2026-03-06
+作者：AI Assistant
+修改摘要：建立 Relation 前跳過 source_id == target_id，避免 "Source and target cannot be the same entity" 觸發例外與 warning 日誌
+更新時間：2025-12-30 09:34
+作者：AI Assistant
+修改摘要：優化 LLM Token 限制：實體提取和關係提取的 max_tokens 從 1000 增加到 3000，以支援提取更多實體和關係（目標：50+ 實體，128+ 關係）
 更新時間：2025-12-26 16:15
 作者：AI Assistant
 修改摘要：修復 JSON 解析問題：1) 將非貪婪匹配改為貪婪匹配確保完整 JSON 陣列匹配；2) 統一 json 模組導入修復變數作用域問題；3) 增強 JSON 解析失敗日誌記錄；4) 添加 JSON 完整性驗證（括號平衡檢查）
@@ -53,7 +75,7 @@ class EntityExtractor:
             prompt = self._build_entity_extraction_prompt(text, entity_types)
             
             # 使用 LLM 提取實體
-            response = await self.llm_service.generate(prompt, max_tokens=1000)
+            response = await self.llm_service.generate(prompt, max_tokens=3000)
             
             # 解析回應
             entities = self._parse_entity_response(response, text)
@@ -205,7 +227,7 @@ class EntityExtractor:
             prompt = self._build_relation_extraction_prompt(text, entities)
             
             # 使用 LLM 提取關係
-            response = await self.llm_service.generate(prompt, max_tokens=1000)
+            response = await self.llm_service.generate(prompt, max_tokens=3000)
             
             # #region agent log
             log_data = {
@@ -358,6 +380,55 @@ class EntityExtractor:
         
         return prompt
     
+    def _entity_name_from_item(self, item: dict) -> Optional[str]:
+        """從 LLM 回傳的 item 取得實體名稱；對照表/代碼類內容可能回 description/code 而非 name。"""
+        for key in ("name", "description", "code", "label", "title"):
+            val = item.get(key)
+            if val is not None and str(val).strip():
+                return str(val).strip()
+        return None
+
+    def _extract_json_array_from_response(self, response: str, start: int) -> Optional[str]:
+        """從 response[start:] 依括號配對擷取 JSON 陣列，跳過字串內的 [ ]，避免 \"[02]\" 等造成錯誤截斷。"""
+        depth = 0
+        i = start
+        in_string = False
+        escape = False
+        quote_char = None
+        n = len(response)
+        while i < n:
+            c = response[i]
+            if escape:
+                escape = False
+                i += 1
+                continue
+            if c == "\\" and in_string:
+                escape = True
+                i += 1
+                continue
+            if in_string:
+                if c == quote_char:
+                    in_string = False
+                i += 1
+                continue
+            if c == '"' or c == "'":
+                in_string = True
+                quote_char = c
+                i += 1
+                continue
+            if c == "[":
+                depth += 1
+                i += 1
+                continue
+            if c == "]":
+                depth -= 1
+                if depth == 0:
+                    return response[start : i + 1]
+                i += 1
+                continue
+            i += 1
+        return response[start:] if depth > 0 else None
+
     def _parse_entity_response(self, response: str, original_text: str) -> List[Entity]:
         """解析 LLM 回應為實體列表"""
         # json 模組已在文件頂部統一導入
@@ -365,6 +436,15 @@ class EntityExtractor:
         matched_pattern = None  # 記錄匹配到的正則表達式模式
         
         try:
+            # 預先移除可能包裹 JSON 的 markdown code fence，避免不完整 ``` 導致匹配失敗
+            clean_response = response
+            stripped = clean_response.lstrip()
+            if stripped.startswith("```"):
+                lines = stripped.splitlines()
+                if len(lines) > 1:
+                    # 移除第一行 ```json / ```，保留後續內容
+                    clean_response = "\n".join(lines[1:])
+
             # 嘗試提取 JSON（更嚴格的匹配）
             # 尋找 JSON 陣列，可能包含在 markdown 代碼塊中
             json_patterns = [
@@ -375,7 +455,7 @@ class EntityExtractor:
             
             json_str = None
             for pattern, pattern_name in json_patterns:
-                match = re.search(pattern, response, re.DOTALL)
+                match = re.search(pattern, clean_response, re.DOTALL)
                 if match:
                     json_str = match.group(1) if match.groups() else match.group(0)
                     matched_pattern = pattern_name
@@ -384,17 +464,17 @@ class EntityExtractor:
             # 如果沒找到，嘗試直接解析整個回應
             if not json_str:
                 # 檢查是否整個回應就是 JSON
-                response_stripped = response.strip()
+                response_stripped = clean_response.strip()
                 if response_stripped.startswith('[') and response_stripped.endswith(']'):
                     json_str = response_stripped
                     matched_pattern = 'full_response'
                 else:
-                    # 嘗試找到第一個 [ 到最後一個 ]
-                    start = response.find('[')
-                    end = response.rfind(']')
-                    if start != -1 and end != -1 and end > start:
-                        json_str = response[start:end+1]
-                        matched_pattern = 'find_brackets'
+                    # 以括號計數找陣列結尾（避免字串內 "]" 如 "[01]" 導致錯誤截斷）
+                    start = clean_response.find('[')
+                    if start != -1:
+                        json_str = self._extract_json_array_from_response(clean_response, start)
+                        if json_str:
+                            matched_pattern = 'find_brackets'
             
             if json_str:
                 # 清理可能的多餘空白和換行
@@ -404,6 +484,51 @@ class EntityExtractor:
                 open_brackets = json_str.count('[')
                 close_brackets = json_str.count(']')
                 if open_brackets != close_brackets:
+                    # 若可能被字串內的 ]（如 "[02]"）誤截，用括號配對重新擷取
+                    first_bracket = response.find('[')
+                    if first_bracket != -1:
+                        reextracted = self._extract_json_array_from_response(response, first_bracket)
+                        if reextracted and reextracted != json_str:
+                            json_str = reextracted.strip()
+                            open_brackets = json_str.count('[')
+                            close_brackets = json_str.count(']')
+                    # 嘗試修復：LLM 截斷可能少 ]（陣列結尾）或少 }]（物件+陣列結尾）
+                    if open_brackets > close_brackets:
+                        diff = open_brackets - close_brackets
+                        raw = json_str.rstrip()
+                        # 優先嘗試「砍到最後一個完整物件結束處」，避免落在半個欄位說明或未關閉的字串中
+                        candidates = []
+                        last_closing_obj = raw.rfind("}")
+                        if last_closing_obj != -1:
+                            candidates.append(raw[: last_closing_obj + 1])
+                        # 退而求其次：沿用原本去掉尾逗號的整段內容
+                        candidates.append(raw.rstrip(",").rstrip())
+
+                        for base in candidates:
+                            for repair_suffix in ["]" * diff, "}" + "]" * diff]:
+                                repaired = base + repair_suffix
+                                try:
+                                    data = json.loads(repaired)
+                                    if isinstance(data, list):
+                                        for item in data:
+                                            if isinstance(item, dict):
+                                                name = self._entity_name_from_item(item)
+                                                if name:
+                                                    entity = Entity(
+                                                        id=str(uuid.uuid4()),
+                                                        type=item.get("type", "Concept"),
+                                                        name=name,
+                                                        properties=item.get("properties", {}),
+                                                        created_at=datetime.now()
+                                                    )
+                                                    entities.append(entity)
+                                        if entities:
+                                            self.logger.info(
+                                                f"Repaired incomplete JSON (entity): suffix {repr(repair_suffix)}, got {len(entities)} entities"
+                                            )
+                                            return entities
+                                except json.JSONDecodeError:
+                                    continue
                     self.logger.warning(
                         f"JSON string appears incomplete: {open_brackets} opening brackets, "
                         f"{close_brackets} closing brackets"
@@ -428,21 +553,22 @@ class EntityExtractor:
                     with open(".cursor/debug.log", "a", encoding="utf-8") as f:
                         f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
                     return entities  # 返回空列表，觸發降級
-                
-                # 嘗試解析 JSON
-                data = json.loads(json_str)
+                else:
+                    data = json.loads(json_str)
                 
                 if isinstance(data, list):
                     for item in data:
-                        if isinstance(item, dict) and "name" in item:
-                            entity = Entity(
-                                id=str(uuid.uuid4()),
-                                type=item.get("type", "Concept"),
-                                name=item.get("name", ""),
-                                properties=item.get("properties", {}),
-                                created_at=datetime.now()
-                            )
-                            entities.append(entity)
+                        if isinstance(item, dict):
+                            name = self._entity_name_from_item(item)
+                            if name:
+                                entity = Entity(
+                                    id=str(uuid.uuid4()),
+                                    type=item.get("type", "Concept"),
+                                    name=name,
+                                    properties=item.get("properties", {}),
+                                    created_at=datetime.now()
+                                )
+                                entities.append(entity)
         except json.JSONDecodeError as e:
             self.logger.debug(f"Failed to parse entity response as JSON: {str(e)}")
             self.logger.debug(f"Response preview: {response[:500]}")
@@ -508,6 +634,14 @@ class EntityExtractor:
             return relations
         
         try:
+            # 預先移除可能包裹 JSON 的 markdown code fence，避免不完整 ``` 導致匹配失敗
+            clean_response = response
+            stripped = clean_response.lstrip()
+            if stripped.startswith("```"):
+                lines = stripped.splitlines()
+                if len(lines) > 1:
+                    clean_response = "\n".join(lines[1:])
+
             # 嘗試提取 JSON（更嚴格的匹配）
             json_patterns = [
                 (r'```json\s*(\[.*?\])\s*```', 'markdown_json_codeblock'),  # markdown JSON 代碼塊（非貪婪，但代碼塊內完整）
@@ -517,7 +651,7 @@ class EntityExtractor:
             
             json_str = None
             for pattern, pattern_name in json_patterns:
-                match = re.search(pattern, response, re.DOTALL)
+                match = re.search(pattern, clean_response, re.DOTALL)
                 if match:
                     json_str = match.group(1) if match.groups() else match.group(0)
                     matched_pattern = pattern_name
@@ -525,16 +659,16 @@ class EntityExtractor:
             
             # 如果沒找到，嘗試直接解析整個回應
             if not json_str:
-                response_stripped = response.strip()
+                response_stripped = clean_response.strip()
                 if response_stripped.startswith('[') and response_stripped.endswith(']'):
                     json_str = response_stripped
                     matched_pattern = 'full_response'
                 else:
-                    start = response.find('[')
-                    end = response.rfind(']')
-                    if start != -1 and end != -1 and end > start:
-                        json_str = response[start:end+1]
-                        matched_pattern = 'find_brackets'
+                    start = clean_response.find('[')
+                    if start != -1:
+                        json_str = self._extract_json_array_from_response(clean_response, start)
+                        if json_str:
+                            matched_pattern = 'find_brackets'
             
             if json_str:
                 json_str = json_str.strip()
@@ -543,6 +677,59 @@ class EntityExtractor:
                 open_brackets = json_str.count('[')
                 close_brackets = json_str.count(']')
                 if open_brackets != close_brackets:
+                    # 若可能被字串內的 ] 誤截，用括號配對重新擷取
+                    first_bracket = response.find('[')
+                    if first_bracket != -1:
+                        reextracted = self._extract_json_array_from_response(response, first_bracket)
+                        if reextracted and reextracted != json_str:
+                            json_str = reextracted.strip()
+                            open_brackets = json_str.count('[')
+                            close_brackets = json_str.count(']')
+                    # 嘗試修復：LLM 截斷可能少 ] 或少 }]，多種後綴依序嘗試；先去掉尾端逗號
+                    if open_brackets > close_brackets:
+                        diff = open_brackets - close_brackets
+                        base = json_str.rstrip().rstrip(",").rstrip()
+                        for repair_suffix in ["]" * diff, "}" + "]" * diff]:
+                            repaired = base + repair_suffix
+                            try:
+                                data = json.loads(repaired)
+                                if isinstance(data, list):
+                                    parsed_items = 0
+                                    for item in data:
+                                        if isinstance(item, dict) and "source" in item and "target" in item:
+                                            source_name = item.get("source", "")
+                                            target_name = item.get("target", "")
+                                            source_entity = entity_map.get(source_name)
+                                            target_entity = entity_map.get(target_name)
+                                            if not source_entity:
+                                                for entity_name, entity in entity_map.items():
+                                                    if source_name in entity_name or entity_name in source_name:
+                                                        source_entity = entity
+                                                        break
+                                            if not target_entity:
+                                                for entity_name, entity in entity_map.items():
+                                                    if target_name in entity_name or entity_name in target_name:
+                                                        target_entity = entity
+                                                        break
+                                            if source_entity and target_entity and source_entity.id != target_entity.id:
+                                                relation = Relation(
+                                                    id=str(uuid.uuid4()),
+                                                    source_id=source_entity.id,
+                                                    target_id=target_entity.id,
+                                                    type=item.get("type", "RELATED_TO"),
+                                                    properties=item.get("properties", {}),
+                                                    weight=1.0,
+                                                    created_at=datetime.now()
+                                                )
+                                                relations.append(relation)
+                                                parsed_items += 1
+                                    if parsed_items > 0:
+                                        self.logger.info(
+                                            f"Repaired incomplete JSON (relation): suffix {repr(repair_suffix)}, got {parsed_items} relations"
+                                        )
+                                        return relations
+                            except json.JSONDecodeError:
+                                continue
                     self.logger.warning(
                         f"JSON string appears incomplete: {open_brackets} opening brackets, "
                         f"{close_brackets} closing brackets"
@@ -568,8 +755,8 @@ class EntityExtractor:
                     with open(".cursor/debug.log", "a", encoding="utf-8") as f:
                         f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
                     return relations  # 返回空列表，觸發降級
-                
-                data = json.loads(json_str)
+                else:
+                    data = json.loads(json_str)
                 
                 if isinstance(data, list):
                     parsed_items = 0
@@ -596,7 +783,7 @@ class EntityExtractor:
                                         target_entity = entity
                                         break
                             
-                            if source_entity and target_entity:
+                            if source_entity and target_entity and source_entity.id != target_entity.id:
                                 relation = Relation(
                                     id=str(uuid.uuid4()),
                                     source_id=source_entity.id,
@@ -738,17 +925,20 @@ class EntityExtractor:
         """規則基礎的實體提取（降級方案）"""
         entities = []
         seen_names = set()  # 避免重複
-        
-        # 1. 提取中文名詞（2-6個中文字）
-        chinese_pattern = r'[\u4e00-\u9fff]{2,6}'
-        chinese_matches = re.findall(chinese_pattern, text)
-        for match in chinese_matches:
-            if match not in seen_names and len(match) >= 2:
-                seen_names.add(match)
+
+        # 1. 先以標點/空白切成完整語意片段，再取純中文部分作為 Concept
+        # 修改原因：原 r'[\u4e00-\u9fff]{2,6}' 為非重疊貪婪滑動視窗，
+        # 會在 6-char 邊界截斷詞語（例如「畫面」→「一畫」+「面增」），產生大量無意義實體。
+        # 改為先以標點切段，保留語意完整的片段（3~12字）。
+        segments = re.split(r'[，。！？、；:\s\n\r\t]+', text)
+        for seg in segments:
+            chinese_only = re.sub(r'[^\u4e00-\u9fff]', '', seg).strip()
+            if 3 <= len(chinese_only) <= 12 and chinese_only not in seen_names:
+                seen_names.add(chinese_only)
                 entity = Entity(
                     id=str(uuid.uuid4()),
                     type="Concept",
-                    name=match,
+                    name=chinese_only,
                     properties={"extracted_by": "rule_based", "language": "chinese"},
                     created_at=datetime.now()
                 )
@@ -939,7 +1129,7 @@ class EntityExtractor:
                             target = sentence_entities[j]
                             
                             relation_key = (source.id, target.id, 'RELATED_TO')
-                            if relation_key not in seen_relations:
+                            if relation_key not in seen_relations and source.id != target.id:
                                 relation = Relation(
                                     id=str(uuid.uuid4()),
                                     source_id=source.id,

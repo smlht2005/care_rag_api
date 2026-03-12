@@ -28,10 +28,11 @@ async def query_endpoint(
     
     with REQUEST_LATENCY.labels(method=method, endpoint=endpoint_path).time():
         try:
-            # 執行查詢
+            # 執行查詢（skip_cache=True 時不讀寫快取，可排除重複回傳舊的「未找到」）
             result = await orchestrator.query(
                 query_request.query,
-                top_k=query_request.top_k or 3
+                top_k=query_request.top_k or 3,
+                skip_cache=query_request.skip_cache or False
             )
             
             response = QueryResponse(
