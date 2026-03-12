@@ -51,7 +51,7 @@ def get_cache_service() -> CacheService:
 
 
 def get_vector_service(
-    graph_store: GraphStore = Depends(lambda: get_graph_store())
+    graph_store: GraphStore = Depends(get_graph_store)
 ) -> VectorService:
     """取得向量服務實例；graph_store 由 FastAPI 依賴注入，可覆寫。"""
     global _vector_service

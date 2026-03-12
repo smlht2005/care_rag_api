@@ -2,6 +2,38 @@
 
 ## 更新歷史
 
+### 2026-03-11 - AI Assistant - PR Review 修正全部完成（skip_cache 測試、StubEmbedding deterministic、deps lambda 修正）
+
+**更新摘要：**
+完成 PR code review 所有待修事項：
+
+1. **`dependencies.py` lambda Depends 修正**
+   - `Depends(lambda: get_graph_store())` → `Depends(get_graph_store)`，讓 FastAPI 正確管理依賴圖與 override。
+
+2. **StubEmbeddingService deterministic 修正**
+   - 原本使用 Python `hash()` 因 hash randomization 跨進程不一致。
+   - 改為 `hashlib.sha256(text.encode()).digest()` 確保同一輸入永遠產生相同向量。
+   - 補充 `tests/test_services/test_stub_embedding_determinism.py`（4/4 通過）。
+
+3. **skip_cache 行為補強測試**
+   - 新增 `tests/test_core/test_skip_cache.py` 共 6 個測試案例，覆蓋：
+     - `RAGService.query(skip_cache=True)` 不讀不寫快取。
+     - `RAGService.query(skip_cache=False)` 讀取並寫入快取。
+     - `RAGService.query(skip_cache=False)` 快取命中時不呼叫 LLM。
+     - `GraphOrchestrator.query(skip_cache=True)` 不讀不寫 orchestrator 快取。
+     - `GraphOrchestrator.query(skip_cache=False)` 快取未命中後寫入。
+     - `GraphOrchestrator.query(skip_cache=False)` 快取命中時不呼叫 rag.query。
+   - 全部 6/6 通過。
+
+**所有 PR Review 必修項目完成確認：**
+- [x] `.db` 移除 git whitelist、`docs/` 取消忽略（已完成）
+- [x] `GET /qa/search` DI bug 修正（qa.py 抽共用函式）（已完成）
+- [x] `lambda Depends` 寫法修正（已完成）
+- [x] `StubEmbeddingService` deterministic（已完成）
+- [x] `skip_cache` 測試補強（已完成）
+
+---
+
 ### 2026-03-11 - AI Assistant - README 補充 `/api/v1/query` QUERY_TYPE 說明
 
 **更新摘要：**

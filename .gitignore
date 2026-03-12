@@ -52,14 +52,6 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Documentation
-docs/
-
 # Database files
 *.db
-
-# Keep these DBs in git (whitelist)
-!data/graph.db
-!data/graph_qa.db
-!data/qa_vectors.db
 

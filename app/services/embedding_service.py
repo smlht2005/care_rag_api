@@ -1,5 +1,8 @@
 """
 Embedding 服務抽象層
+更新時間：2026-03-11 14:30
+作者：AI Assistant
+修改摘要：StubEmbeddingService 改用 hashlib.sha256 確保跨進程 deterministic（修正 Python hash randomization 問題）
 更新時間：2026-03-10 12:20
 作者：AI Assistant
 修改摘要：完全移除 google.generativeai 依賴，只保留新 SDK google.genai + StubEmbeddingService
@@ -141,13 +144,23 @@ class StubEmbeddingService(BaseEmbeddingService):
         self._logger.info(f"使用 StubEmbeddingService，dim={dim}")
 
     async def embed(self, texts: List[str]) -> List[List[float]]:
+        import hashlib
         import math
+        import struct
 
         vectors: List[List[float]] = []
         for t in texts:
-            # 利用內建 hash 與簡單 trig 函式產生 pseudo-vector（僅為 deterministic stub）
-            base = float(abs(hash(t)) % (10**8) + 1)
-            vec = [math.sin(base * (i + 1)) for i in range(self.dim)]
+            # 使用 sha256 確保跨進程 / 跨啟動 deterministic（避免 Python hash randomization 問題）
+            digest = hashlib.sha256(t.encode("utf-8", errors="replace")).digest()
+            # 從 digest bytes 逐步展開至 dim 維向量（重複雜湊填充，保持 deterministic）
+            extended = bytearray()
+            seed = digest
+            while len(extended) < self.dim * 4:
+                seed = hashlib.sha256(seed).digest()
+                extended += seed
+            raw_ints = struct.unpack_from(f"<{self.dim}I", bytes(extended[: self.dim * 4]))
+            # 歸一化至 [-1, 1]
+            vec = [math.sin(float(v)) for v in raw_ints]
             vectors.append(vec)
         return vectors
 

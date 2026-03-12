@@ -104,6 +104,119 @@ def _build_rag_context(results: list, max_items: int = RAG_CONTEXT_MAX_ITEMS, ma
     return "\n".join(parts) if parts else ""
 
 
+async def _perform_qa_search(
+    search_request: QASearchRequest,
+    graph_store: SQLiteGraphStore,
+) -> list[QAResult]:
+    """執行關鍵字 QA 搜尋，回傳 QAResult 列表。"""
+    # 查詢所有 QA 實體
+    all_qa = await graph_store.get_entities_by_type("QA", limit=10000)
+
+    # 如果指定了 doc_id，先篩選
+    if search_request.doc_id:
+        all_qa = [qa for qa in all_qa if qa.id.startswith(f"{search_request.doc_id}_qa_")]
+
+    # 準備查詢 token（支援多關鍵字 AND）
+    raw_query = search_request.query or ""
+    tokens = [t.strip().lower() for t in raw_query.split() if t.strip()]
+    simple_query = raw_query.lower()
+
+    # 搜尋匹配的 QA
+    results: list[QAResult] = []
+
+    for qa in all_qa:
+        props = qa.properties
+
+        title = props.get("qa_title") or qa.name or ""
+        scenario = props.get("scenario", "")
+        keywords = props.get("keywords", [])
+        keywords_text = ",".join(str(k) for k in keywords) if keywords else ""
+        question = props.get("question", "")
+        answer = props.get("answer", "")
+        notes = props.get("notes", "")
+
+        # 組合可搜尋文本
+        search_text = "\n".join([
+            str(title),
+            str(scenario),
+            keywords_text,
+            str(question),
+            str(answer),
+            str(notes),
+        ]).lower()
+
+        matched = False
+        if tokens:
+            matched = all(t in search_text for t in tokens)
+        else:
+            if simple_query and (
+                simple_query in question.lower()
+                or simple_query in answer.lower()
+                or any(simple_query in str(k).lower() for k in keywords)
+            ):
+                matched = True
+
+        if matched:
+            results.append(QAResult(
+                id=qa.id,
+                qa_number=props.get("qa_number"),
+                question=question,
+                answer=answer,
+                scenario=scenario,
+                keywords=keywords,
+                steps=props.get("steps", []),
+                notes=notes,
+                metadata=props.get("metadata", {})
+            ))
+
+    # 限制結果數量
+    return results[:search_request.limit]
+
+
+async def _handle_search_response(
+    search_request: QASearchRequest,
+    results: list[QAResult],
+    llm_service: LLMService,
+) -> QASearchResponse:
+    """依 QUERY_TYPE 將搜尋結果轉成 QASearchResponse。"""
+    query_type = get_query_type()
+
+    # 依 QUERY_TYPE 分流
+    if query_type == "sql":
+        return QASearchResponse(
+            query=search_request.query,
+            total=len(results),
+            results=results,
+            answer=None,
+        )
+
+    # RAG 模式
+    if not results:
+        return QASearchResponse(
+            query=search_request.query,
+            total=0,
+            results=[],
+            answer="",
+        )
+    context = _build_rag_context(results)
+    prompt = (
+        f"以下為參考 Q&A：\n{context}\n\n"
+        "請根據以上內容簡要回答使用者問題，若無法從參考中回答請註明。\n\n"
+        f"使用者問題：{search_request.query}"
+    )
+    try:
+        answer_text = await llm_service.generate(prompt, max_tokens=2000)
+    except Exception as e:
+        logger.warning(f"RAG LLM generate failed, fallback to results only: {e}", exc_info=True)
+        answer_text = None
+    return QASearchResponse(
+        query=search_request.query,
+        total=len(results),
+        results=results,
+        answer=answer_text or None,
+    )
+
+
 @router.post("/search", response_model=QASearchResponse)
 async def search_qa(
     request: Request,
@@ -114,113 +227,14 @@ async def search_qa(
     """搜尋 QA（依 QUERY_TYPE：sql 回傳列表，rag 回傳 LLM 單一回答 + sources）"""
     endpoint_path = "/api/v1/qa/search"
     method = request.method
-    query_type = get_query_type()
 
     with REQUEST_LATENCY.labels(method=method, endpoint=endpoint_path).time():
         try:
             await graph_store.initialize()
-
-            # 查詢所有 QA 實體
-            all_qa = await graph_store.get_entities_by_type("QA", limit=10000)
-
-            # 如果指定了 doc_id，先篩選
-            if search_request.doc_id:
-                all_qa = [qa for qa in all_qa if qa.id.startswith(f"{search_request.doc_id}_qa_")]
-
-            # 準備查詢 token（支援多關鍵字 AND）
-            raw_query = search_request.query or ""
-            tokens = [t.strip().lower() for t in raw_query.split() if t.strip()]
-            simple_query = raw_query.lower()
-
-            # 搜尋匹配的 QA
-            results = []
-
-            for qa in all_qa:
-                props = qa.properties
-
-                title = props.get("qa_title") or qa.name or ""
-                scenario = props.get("scenario", "")
-                keywords = props.get("keywords", [])
-                keywords_text = ",".join(str(k) for k in keywords) if keywords else ""
-                question = props.get("question", "")
-                answer = props.get("answer", "")
-                notes = props.get("notes", "")
-
-                # 組合可搜尋文本
-                search_text = "\n".join([
-                    str(title),
-                    str(scenario),
-                    keywords_text,
-                    str(question),
-                    str(answer),
-                    str(notes),
-                ]).lower()
-
-                matched = False
-                if tokens:
-                    matched = all(t in search_text for t in tokens)
-                else:
-                    if simple_query and (
-                        simple_query in question.lower()
-                        or simple_query in answer.lower()
-                        or any(simple_query in str(k).lower() for k in keywords)
-                    ):
-                        matched = True
-
-                if matched:
-                    results.append(QAResult(
-                        id=qa.id,
-                        qa_number=props.get("qa_number"),
-                        question=question,
-                        answer=answer,
-                        scenario=scenario,
-                        keywords=keywords,
-                        steps=props.get("steps", []),
-                        notes=notes,
-                        metadata=props.get("metadata", {})
-                    ))
-
-            # 限制結果數量
-            results = results[:search_request.limit]
-
-            # 依 QUERY_TYPE 分流
-            if query_type == "sql":
-                REQUEST_COUNTER.labels(method=method, endpoint=endpoint_path, status="200").inc()
-                return QASearchResponse(
-                    query=search_request.query,
-                    total=len(results),
-                    results=results,
-                    answer=None,
-                )
-
-            # RAG 模式
-            if not results:
-                REQUEST_COUNTER.labels(method=method, endpoint=endpoint_path, status="200").inc()
-                return QASearchResponse(
-                    query=search_request.query,
-                    total=0,
-                    results=[],
-                    answer="",
-                )
-            context = _build_rag_context(results)
-            prompt = (
-                f"以下為參考 Q&A：\n{context}\n\n"
-                "請根據以上內容簡要回答使用者問題，若無法從參考中回答請註明。\n\n"
-                f"使用者問題：{search_request.query}"
-            )
-            try:
-                answer_text = await llm_service.generate(prompt, max_tokens=2000)
-            except Exception as e:
-                logger.warning(f"RAG LLM generate failed, fallback to results only: {e}", exc_info=True)
-                answer_text = None
+            results = await _perform_qa_search(search_request, graph_store)
+            response = await _handle_search_response(search_request, results, llm_service)
             REQUEST_COUNTER.labels(method=method, endpoint=endpoint_path, status="200").inc()
-            return QASearchResponse(
-                query=search_request.query,
-                total=len(results),
-                results=results,
-                answer=answer_text or None,
-            )
-
+            return response
         except Exception as e:
             logger.error(f"Search QA error: {str(e)}")
             REQUEST_COUNTER.labels(method=method, endpoint=endpoint_path, status="500").inc()
@@ -295,8 +309,24 @@ async def search_qa_get(
     query: str = Query(..., description="搜尋關鍵詞", min_length=1, max_length=200),
     limit: int = Query(10, description="返回結果數量", ge=1, le=50),
     doc_id: str = Query(None, description="限制搜尋特定文件 ID"),
-    graph_store: SQLiteGraphStore = Depends(get_qa_graph_store)
+    graph_store: SQLiteGraphStore = Depends(get_qa_graph_store),
+    llm_service: LLMService = Depends(get_llm_service),
 ):
     """搜尋 QA (GET 方法)"""
     search_request = QASearchRequest(query=query, limit=limit, doc_id=doc_id)
-    return await search_qa(request, search_request, graph_store)
+    # 與 POST /search 共用搜尋與回應邏輯，避免 DI 問題與重複程式碼
+    endpoint_path = "/api/v1/qa/search"
+    method = request.method
+    with REQUEST_LATENCY.labels(method=method, endpoint=endpoint_path).time():
+        try:
+            await graph_store.initialize()
+            results = await _perform_qa_search(search_request, graph_store)
+            response = await _handle_search_response(search_request, results, llm_service)
+            REQUEST_COUNTER.labels(method=method, endpoint=endpoint_path, status="200").inc()
+            return response
+        except Exception as e:
+            logger.error(f"Search QA (GET) error: {str(e)}")
+            REQUEST_COUNTER.labels(method=method, endpoint=endpoint_path, status="500").inc()
+            raise HTTPException(status_code=500, detail=str(e))
+        finally:
+            await graph_store.close()
