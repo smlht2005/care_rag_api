@@ -32,11 +32,11 @@ async def test_gemini_api_key():
     api_key = settings.GOOGLE_API_KEY or os.getenv("GOOGLE_API_KEY")
     
     if not api_key:
-        print("❌ API Key 未配置")
+        print("[X] API Key 未配置")
         print("   請在 .env 檔案中設置 GOOGLE_API_KEY")
         return False
     
-    print(f"✅ API Key 已配置: {api_key[:10]}...{api_key[-4:]}")
+    print(f"[OK] API Key 已配置: {api_key[:10]}...{api_key[-4:]}")
     return True
 
 
@@ -50,14 +50,12 @@ async def test_gemini_model_initialization():
         gemini_llm = GeminiLLM()
         
         if gemini_llm._use_real_api:
-            print(f"✅ 模型初始化成功")
+            print("[OK] 模型初始化成功")
             print(f"   使用真實 API: {gemini_llm._use_real_api}")
             print(f"   模型名稱: {settings.GEMINI_MODEL_NAME}")
-            if gemini_llm._model:
-                print(f"   模型物件: {type(gemini_llm._model).__name__}")
             return True
         else:
-            print("⚠️ 使用 Stub 模式（降級）")
+            print("[WARN] 使用 Stub 模式（降級）")
             if not gemini_llm.api_key:
                 print("   原因: API Key 未配置")
             else:
@@ -65,7 +63,7 @@ async def test_gemini_model_initialization():
             return False
             
     except Exception as e:
-        print(f"❌ 模型初始化失敗: {str(e)}")
+        print(f"[X] 模型初始化失敗: {str(e)}")
         return False
 
 
@@ -85,18 +83,18 @@ async def test_gemini_basic_generation():
         result = await gemini_llm.generate(test_prompt, max_tokens=100, temperature=0.7)
         
         if result and not result.startswith("[Gemini Stub]"):
-            print(f"✅ API 呼叫成功")
+            print("[OK] API 呼叫成功")
             print(f"   回應長度: {len(result)} 字元")
             print(f"   回應預覽: {result[:100]}...")
             return True
         else:
-            print("⚠️ 使用 Stub 模式（降級）")
+            print("[WARN] 使用 Stub 模式（降級）")
             print(f"   回應: {result[:100]}...")
             return False
             
     except Exception as e:
         error_str = str(e)
-        print(f"❌ API 呼叫失敗: {error_str}")
+        print(f"[X] API 呼叫失敗: {error_str}")
         
         if "429" in error_str or "quota" in error_str.lower():
             print("   原因: API 配額已用完（免費層配額限制）")
@@ -157,15 +155,15 @@ async def test_gemini_streaming():
                 break
         
         if chunks and not chunks[0].startswith("[Gemini Stub]"):
-            print(f"✅ 串流 API 呼叫成功")
+            print("[OK] 串流 API 呼叫成功")
             print(f"   收到 {len(chunks)} 個片段")
             return True
         else:
-            print("⚠️ 使用 Stub 模式（降級）")
+            print("[WARN] 使用 Stub 模式（降級）")
             return False
             
     except Exception as e:
-        print(f"❌ 串流 API 呼叫失敗: {str(e)}")
+        print(f"[X] 串流 API 呼叫失敗: {str(e)}")
         return False
 
 
@@ -185,16 +183,16 @@ async def test_llm_service_integration():
         result = await llm_service.generate(test_prompt, max_tokens=200)
         
         if result and not result.startswith("[Gemini Stub]"):
-            print(f"✅ LLMService 整合成功")
+            print("[OK] LLMService 整合成功")
             print(f"   回應長度: {len(result)} 字元")
             print(f"   回應預覽: {result[:150]}...")
             return True
         else:
-            print("⚠️ 使用 Stub 模式（降級）")
+            print("[WARN] 使用 Stub 模式（降級）")
             return False
             
     except Exception as e:
-        print(f"❌ LLMService 整合失敗: {str(e)}")
+        print(f"[X] LLMService 整合失敗: {str(e)}")
         return False
 
 
@@ -205,51 +203,40 @@ async def test_available_models():
     print("=" * 60)
     
     try:
-        import google.generativeai as genai
-        
-        # 優先順序：1. .env 檔案（Settings）2. 環境變數
-        # 這樣可以確保專案配置的一致性
-        api_key = settings.GOOGLE_API_KEY or os.getenv("GOOGLE_API_KEY")
-        if not api_key:
-            print("⚠️ API Key 未配置，無法檢查可用模型")
-            return False
-        
-        genai.configure(api_key=api_key)
-        
+        from google import genai as genai_new  # type: ignore
+    except ImportError:
+        print("⚠️ google-genai 未安裝")
+        print("   請執行: pip install google-genai")
+        return False
+
+    # 優先順序：1. .env 檔案（Settings）2. 環境變數
+    api_key = settings.GOOGLE_API_KEY or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        print("⚠️ API Key 未配置，無法檢查可用模型")
+        return False
+
+    try:
+        client = genai_new.Client(api_key=api_key)
         print("正在查詢可用模型...")
-        models = genai.list_models()
-        
-        available_models = []
-        for model in models:
-            if 'generateContent' in model.supported_generation_methods:
-                available_models.append(model.name)
-        
+        models = client.models.list()
+
+        available_models = [m.name for m in models]
         if available_models:
-            print(f"✅ 找到 {len(available_models)} 個可用模型:")
+            print(f"[OK] 找到 {len(available_models)} 個可用模型:")
             for model in available_models[:10]:  # 只顯示前 10 個
                 print(f"   - {model}")
-            
-            # 檢查當前配置的模型是否可用
+
             current_model = settings.GEMINI_MODEL_NAME
             if any(current_model in model for model in available_models):
-                print(f"\n✅ 當前配置的模型 '{current_model}' 可用")
+                print(f"\n[OK] 當前配置的模型 '{current_model}' 可用")
             else:
-                print(f"\n⚠️ 當前配置的模型 '{current_model}' 不在可用列表中")
-                print("   建議使用以下模型之一:")
-                for model in available_models[:5]:
-                    print(f"   - {model}")
-            
+                print(f"\n[WARN] 當前配置的模型 '{current_model}' 不在可用列表中")
             return True
         else:
-            print("❌ 未找到可用模型")
+            print("[X] 未找到可用模型")
             return False
-            
-    except ImportError:
-        print("⚠️ google-generativeai 未安裝")
-        print("   請執行: pip install google-generativeai")
-        return False
     except Exception as e:
-        print(f"❌ 查詢模型失敗: {str(e)}")
+        print(f"[X] 查詢模型失敗: {str(e)}")
         return False
 
 
@@ -285,27 +272,27 @@ async def main():
     total = len(results)
     
     for test_name, result in results:
-        status = "✅ 通過" if result else "❌ 失敗"
+        status = "[OK] 通過" if result else "[X] 失敗"
         print(f"{status}: {test_name}")
     
     print(f"\n總計: {passed}/{total} 測試通過")
     
     if passed == total:
-        print("\n🎉 所有測試通過！Gemini LLM 服務正常工作。")
+        print("\n[OK] 所有測試通過，Gemini LLM 服務正常工作。")
     elif passed > 0:
-        print("\n⚠️ 部分測試通過，請檢查失敗的測試項目。")
+        print("\n[WARN] 部分測試通過，請檢查失敗的測試項目。")
     else:
-        print("\n❌ 所有測試失敗，請檢查配置和 API Key。")
+        print("\n[X] 所有測試失敗，請檢查配置和 API Key。")
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n\n⚠️ 測試被用戶中斷（Ctrl+C）")
+        print("\n測試被用戶中斷（Ctrl+C）")
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ 測試執行失敗: {str(e)}")
+        print(f"\n[X] 測試執行失敗: {str(e)}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

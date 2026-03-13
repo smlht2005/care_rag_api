@@ -1,3 +1,7 @@
+更新時間：2026-03-11
+作者：AI Assistant
+修改摘要：補充 `/api/v1/query` 在 QUERY_TYPE=sql/rag 下的行為說明，說明與 QA Graph 端點的關係
+
 # Care RAG API
 
 企業級 RAG (Retrieval-Augmented Generation) API - 支援 REST、SSE 和 WebSocket 協定
@@ -52,7 +56,13 @@ docker-compose up --build
 ### API 端點
 
 **查詢端點：**
-- `POST /api/v1/query` - REST 查詢端點
+- `POST /api/v1/query` - REST 查詢端點  
+  - 行為由環境變數 `QUERY_TYPE` 控制：
+    - `QUERY_TYPE=sql`：執行 **關鍵字 QA 搜尋**（使用 `graph_qa.db`），回傳多筆來源列表（`sources`），`answer` 為簡單摘要或第一筆結果，**不呼叫 LLM**。
+    - `QUERY_TYPE=rag`：執行 **GraphRAG + LLM**（使用 `graph.db` + 向量 + 圖增強），在 `sources` 基礎上由 LLM 產生單一整合回答。
+  - 建議用法：
+    - 只需要「找出哪幾筆 QA 匹配關鍵字」時用 `sql`。
+    - 需要「自然語問答 + 單一回答」時用 `rag`。
 - `GET /api/v1/query/stream` - SSE 串流查詢端點
 - `WebSocket /api/v1/ws/chat` - WebSocket 聊天端點
 - `WebSocket /api/v1/ws/query` - WebSocket 查詢端點
@@ -258,6 +268,29 @@ python scripts/check_db.py
 - 重置會刪除所有現有數據，建議先備份 `data/graph.db`
 - 確保沒有其他進程正在使用資料庫
 - 重置只清理圖資料庫，向量資料庫需要單獨處理
+
+## QA Graph（graph_qa.db）與 IC 卡錯誤規格整合
+
+- **單一 DB，多子圖**：`graph_qa.db` 使用與 `graph.db` 相同的 `entities` / `relations` schema，內部可以同時存放多種知識子圖：
+  - 一般 QA 知識庫：`Document(type=\"qa_markdown\")` + `QA` + `CONTAINS_QA`
+  - 診所操作手冊等 QA/知識點（由 PDF 解析腳本建立）
+- **IC 卡錯誤規格子圖**（本專案擴充設計）：
+  - 新增一個 `Document(type=\"ic_error_spec\")`，代表 `data/hisqa/IC卡資料上傳錯誤對照.txt`
+  - 新增兩種實體型別：
+    - `IC_Field`：欄位代碼（例如 `M07`、`D06`），保存欄位中文說明與區段資訊
+    - `IC_Error`：錯誤代碼（例如 `01`、`AD69`、`Y016`），保存完整中文錯誤訊息
+  - 新增關係型別：
+    - `CONTAINS_FIELD`：`Document -> IC_Field`，表示文件中定義了哪些欄位
+    - `CONTAINS_ERROR`：`Document -> IC_Error`，表示文件中定義了哪些錯誤代碼
+    - `ERROR_ON_FIELD`：`IC_Error -> IC_Field`，表示某錯誤代碼與哪些欄位有邏輯關聯（由錯誤說明文字中提到的 `Mxx` / `Dxx` 等欄位解析而來）
+- **與現有 QA API 的關係**：
+  - 現有 `/api/v1/qa/*` 端點仍只針對 `Document(type=\"qa_markdown\")` 與 `QA` 兩種實體做查詢，不會受到 IC 卡錯誤規格子圖影響。
+  - IC 卡錯誤規格資料與其他 QA 資料共用同一顆 `data/graph_qa.db`，透過 `SQLiteGraphStore` 存取；未來如需對 IC 錯誤提供專用 API，可在 `app/api/v1/endpoints/qa.py` 新增額外端點，針對 `IC_Error` / `IC_Field` 以及 `ERROR_ON_FIELD` 關係進行查詢。
+- **建庫腳本規劃**：
+  - `scripts/parse_qa_markdown_to_graph.py`：匯入 Markdown QA 到 `graph_qa.db`
+  - `scripts/import_qa_markdown_batch.py`：批次匯入多個 QA Markdown 檔案
+  - `scripts/parse_clinic_manual_pdfs_to_qa_graph.py`：從 PDF 抽取 QA 與知識點匯入 `graph_qa.db`
+  - `scripts/import_ic_error_spec_to_qa_graph.py`：從 `data/hisqa/IC卡資料上傳錯誤對照.txt` 匯入 IC 卡欄位與錯誤代碼，建立上述實體與關係（本計畫新增）
 
 ## 開發
 

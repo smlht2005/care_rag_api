@@ -1,5 +1,9 @@
 """
 GraphRAG 圖結構儲存系統
+
+更新時間：2025-12-29 18:37
+作者：AI Assistant
+修改摘要：添加 get_all_entities() 和 get_all_relations() 方法，支援獲取所有實體和關係
 """
 import json
 import uuid
@@ -762,6 +766,63 @@ class SQLiteGraphStore(GraphStore):
             return relations
         except Exception as e:
             self.logger.error(f"Failed to get relations by type: {str(e)}")
+            return []
+    
+    async def get_all_entities(self, limit: int = 10000) -> List[Entity]:
+        """獲取所有實體"""
+        try:
+            if not self.conn:
+                await self.initialize()
+            
+            entities = []
+            async with self.conn.cursor() as cursor:
+                await cursor.execute("""
+                    SELECT * FROM entities LIMIT ?
+                """, (limit,))
+                
+                rows = await cursor.fetchall()
+                for row in rows:
+                    entities.append(Entity(
+                        id=row["id"],
+                        type=row["type"],
+                        name=row["name"],
+                        properties=json.loads(row["properties"]),
+                        created_at=datetime.fromisoformat(row["created_at"]),
+                        updated_at=datetime.fromisoformat(row["updated_at"])
+                    ))
+            
+            return entities
+        except Exception as e:
+            self.logger.error(f"Failed to get all entities: {str(e)}")
+            return []
+    
+    async def get_all_relations(self, limit: int = 10000) -> List[Relation]:
+        """獲取所有關係"""
+        try:
+            if not self.conn:
+                await self.initialize()
+            
+            relations = []
+            async with self.conn.cursor() as cursor:
+                await cursor.execute("""
+                    SELECT * FROM relations LIMIT ?
+                """, (limit,))
+                
+                rows = await cursor.fetchall()
+                for row in rows:
+                    relations.append(Relation(
+                        id=row["id"],
+                        source_id=row["source_id"],
+                        target_id=row["target_id"],
+                        type=row["type"],
+                        properties=json.loads(row["properties"]),
+                        weight=row["weight"],
+                        created_at=datetime.fromisoformat(row["created_at"])
+                    ))
+            
+            return relations
+        except Exception as e:
+            self.logger.error(f"Failed to get all relations: {str(e)}")
             return []
     
     async def close(self):

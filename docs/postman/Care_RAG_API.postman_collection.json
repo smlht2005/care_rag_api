@@ -443,6 +443,164 @@
 				}
 			],
 			"description": "管理相關端點（需要 API Key）"
+		},
+		{
+			"name": "QA",
+			"item": [
+				{
+					"name": "Get QA Documents",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/qa/documents",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "qa", "documents"]
+						},
+						"description": "取得所有 QA 文件列表"
+					},
+					"response": []
+				},
+				{
+					"name": "Search QA - POST",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"掛號\",\n  \"limit\": 10\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/qa/search",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "qa", "search"]
+						},
+						"description": "搜尋 QA（POST 方法）"
+					},
+					"response": []
+				},
+				{
+					"name": "Search QA - GET",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/v1/qa/search?query=F1&limit=5",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "qa", "search"],
+							"query": [
+								{
+									"key": "query",
+									"value": "F1",
+									"description": "搜尋關鍵詞"
+								},
+								{
+									"key": "limit",
+									"value": "5",
+									"description": "返回結果數量"
+								}
+							]
+						},
+						"description": "搜尋 QA（GET 方法）"
+					},
+					"response": []
+				},
+				{
+					"name": "Search QA - 衛材",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"衛材\",\n  \"limit\": 10\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/qa/search",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "qa", "search"]
+						},
+						"description": "搜尋衛材相關 QA"
+					},
+					"response": []
+				},
+				{
+					"name": "Search QA - 指定文件",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"F1\",\n  \"limit\": 10,\n  \"doc_id\": \"掛號qa\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/qa/search",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "qa", "search"]
+						},
+						"description": "在指定文件中搜尋 QA"
+					},
+					"response": []
+				},
+				{
+					"name": "Get QA by Document",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"doc_id\": \"掛號qa\",\n  \"limit\": 20\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/qa/by-document",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "qa", "by-document"]
+						},
+						"description": "根據文件 ID 取得所有 QA"
+					},
+					"response": []
+				}
+			],
+			"description": "QA 查詢相關端點"
 		}
 	],
 	"variable": [

@@ -1,5 +1,11 @@
 """
 GraphRAG 編排器
+更新時間：2026-03-11
+作者：AI Assistant
+修改摘要：有圖時改為「只檢索不生成」+ 圖增強後一次 LLM，避免 RAG 先生成再圖增強又生成的重複呼叫
+更新時間：2026-03-09
+作者：AI Assistant
+修改摘要：僅依 RAG 來源回答；無來源時回傳「未找到」，有來源時依合併來源重新生成答案
 更新時間：2025-12-26 12:30
 作者：AI Assistant
 修改摘要：修復圖查詢邏輯錯誤，添加實體語義匹配、關係查詢、並行處理、動態權重計算
@@ -7,7 +13,12 @@ GraphRAG 編排器
 import logging
 import asyncio
 from typing import Dict, List, Optional, Any, TypedDict, Set
-from app.services.rag_service import RAGService
+from app.services.rag_service import (
+    RAGService,
+    NO_MATCH_MESSAGE,
+    _is_stub_response,
+    _fallback_answer_from_sources,
+)
 from app.services.cache_service import CacheService
 from app.core.graph_store import GraphStore, Entity, Relation
 from app.utils.cache_utils import generate_cache_key
@@ -34,18 +45,18 @@ class GraphOrchestrator:
         self.cache_service = cache_service
         self.logger = logging.getLogger("GraphOrchestrator")
 
-    async def query(self, query_text: str, top_k: int = 3) -> Dict:
+    async def query(self, query_text: str, top_k: int = 3, skip_cache: bool = False) -> Dict:
         """
         執行 GraphRAG 查詢
         
         流程：
-        1. 檢查快取 -> 2. 向量檢索 -> 3. 圖查詢 -> 4. 結果融合 -> 5. LLM生成 -> 6. 快取結果
+        1. 檢查快取（skip_cache 時略過）-> 2. 向量檢索 -> 3. 圖查詢 -> 4. 結果融合 -> 5. LLM生成 -> 6. 快取結果（skip_cache 時不寫入）
         """
         try:
-            self.logger.debug(f"GraphRAG query started: {query_text[:100]}...")
+            self.logger.debug(f"GraphRAG query started: {query_text[:100]}..., skip_cache={skip_cache}")
             
             # 1. 檢查快取（chkgpt 設計，在 GraphRAG 層級快取完整結果）
-            if self.cache_service:
+            if self.cache_service and not skip_cache:
                 cache_key = generate_cache_key("graphrag_query", query_text, top_k=top_k)
                 cached = await self.cache_service.get(cache_key)
                 if cached:
@@ -54,10 +65,13 @@ class GraphOrchestrator:
                 else:
                     self.logger.debug(f"GraphRAG cache miss for query: {query_text[:50]}...")
             
-            # 2. 執行 RAG 查詢（向量檢索，內部也有快取）
-            result = await self.rag_service.query(query_text, top_k=top_k)
+            # 2. 有圖時只做檢索（不呼叫 LLM）；無圖時走完整 RAG（檢索 + 一次 LLM），避免圖增強後重複呼叫 LLM
+            if self.graph_store:
+                result = await self.rag_service.retrieve(query_text, top_k=top_k)
+            else:
+                result = await self.rag_service.query(query_text, top_k=top_k, skip_cache=skip_cache)
             
-            # 3. 圖查詢增強（如果 GraphStore 可用）
+            # 3. 圖查詢增強（僅當 GraphStore 可用）
             graph_enhanced_sources = []
             graph_entities = []
             graph_relations = []
@@ -99,14 +113,30 @@ class GraphOrchestrator:
                 result["sources"] = all_sources[:top_k]  # 只返回 top_k
                 result["graph_enhanced"] = True
             
+            # 4.1 設定 answer：無來源則「未找到」；有圖時為 retrieve 路徑，只在此呼叫一次 LLM
+            final_sources = result.get("sources", [])
+            if not final_sources:
+                result["answer"] = NO_MATCH_MESSAGE
+            elif self.graph_store:
+                # 有圖：本次為 retrieve 路徑，尚未呼叫 LLM，在此只呼叫一次
+                result["answer"] = await self.rag_service.generate_answer_from_sources(
+                    final_sources, query_text
+                )
+            # 無圖：result 來自 rag.query()，已含 answer，不重複呼叫
+
+            # 安全網：若最終 answer 仍為 Stub 回應（例如 RAG 層未替換），改從來源擷取
+            if final_sources and _is_stub_response(result.get("answer", "")):
+                self.logger.warning("Orchestrator 偵測到 Stub 回應，改從來源擷取答案")
+                result["answer"] = _fallback_answer_from_sources(final_sources, query_text)
+            
             # 添加圖結構資訊
             if graph_entities:
                 result["graph_entities"] = [e.to_dict() if hasattr(e, 'to_dict') else e for e in graph_entities]
             if graph_relations:
                 result["graph_relations"] = [r.to_dict() if hasattr(r, 'to_dict') else r for r in graph_relations]
             
-            # 5. 快取結果（在 GraphRAG 層級）
-            if self.cache_service:
+            # 5. 快取結果（在 GraphRAG 層級；skip_cache 時不寫入）
+            if self.cache_service and not skip_cache:
                 cache_key = generate_cache_key("graphrag_query", query_text, top_k=top_k)
                 await self.cache_service.set(cache_key, result, ttl=settings.GRAPH_CACHE_TTL)
             
@@ -152,38 +182,31 @@ class GraphOrchestrator:
                     relations=[]
                 )
             
-            # 2. 使用查詢文本搜索相關實體（問題 2：實體語義匹配）
-            query_entities_task = self.graph_store.search_entities(
-                query_text,
-                limit=settings.GRAPH_QUERY_MAX_ENTITIES
-            )
-            
-            # 3. 從文檔中查找實體（通過 CONTAINS 關係）
-            doc_entities_tasks = []
+            # 2 + 3. 同步建立所有協程（不 await），然後一次 gather 真正並行執行
+            all_doc_tasks: List[Any] = []
             for doc_id in doc_ids[:settings.GRAPH_QUERY_MAX_ENTITIES]:
-                # 查詢文檔實體（如果存在）
-                doc_entity_task = self.graph_store.get_entity(doc_id)
-                # 查詢文檔包含的實體（通過 CONTAINS 關係）
-                doc_contains_task = self.graph_store.get_neighbors(
-                    doc_id,
-                    relation_type="CONTAINS",
-                    direction="outgoing"
+                all_doc_tasks.append(self.graph_store.get_entity(doc_id))
+                all_doc_tasks.append(
+                    self.graph_store.get_neighbors(
+                        doc_id,
+                        relation_type="CONTAINS",
+                        direction="outgoing",
+                    )
                 )
-                doc_entities_tasks.append((doc_entity_task, doc_contains_task))
-            
-            # 4. 並行執行查詢（問題 4：並行處理）
-            query_entities = await query_entities_task
-            
-            # 並行查詢文檔相關實體（展平任務列表）
-            all_doc_tasks = []
-            for doc_entity_task, doc_contains_task in doc_entities_tasks:
-                all_doc_tasks.append(doc_entity_task)
-                all_doc_tasks.append(doc_contains_task)
-            
-            doc_results = await asyncio.gather(
+
+            # 4. 所有任務（search_entities + doc 查詢）同時發起
+            all_results = await asyncio.gather(
+                self.graph_store.search_entities(
+                    query_text,
+                    limit=settings.GRAPH_QUERY_MAX_ENTITIES,
+                ),
                 *all_doc_tasks,
-                return_exceptions=True
+                return_exceptions=True,
             )
+
+            first = all_results[0]
+            query_entities = first if isinstance(first, list) else []
+            doc_results = all_results[1:]
             
             # 處理文檔實體結果（每兩個結果為一對：doc_entity, contains_entities）
             doc_entities: List[Entity] = []
@@ -257,10 +280,19 @@ class GraphOrchestrator:
                             
                             # 計算動態權重
                             score = self._calculate_entity_score(neighbor, query_text)
+                            # 圖來源 content：實體名稱 + properties 內文字，供 LLM 有足夠上下文回答（避免僅名稱時回「未找到」）
+                            content_parts = [neighbor.name]
+                            if neighbor.properties:
+                                for v in neighbor.properties.values():
+                                    if isinstance(v, str) and v.strip():
+                                        content_parts.append(v.strip())
+                                    elif isinstance(v, (list, dict)) and str(v).strip():
+                                        content_parts.append(str(v)[:1500])
+                            graph_content = "\n".join(content_parts) or neighbor.name
                             
                             graph_sources.append({
                                 "id": neighbor.id,
-                                "content": neighbor.name,
+                                "content": graph_content,
                                 "score": score,  # 動態權重
                                 "metadata": {
                                     "source": "graph",

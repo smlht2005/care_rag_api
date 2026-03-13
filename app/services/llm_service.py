@@ -1,5 +1,14 @@
 """
 LLM 服務抽象化
+更新時間：2026-03-06 (依用戶環境日期)
+作者：AI Assistant
+修改摘要：修正 Gemini generate_content 參數：改用 config=types.GenerateContentConfig(max_output_tokens, temperature)，移除不支援的 generation_config；串流改為 generate_content_stream，使真實 API 成功、減少 stub 使用
+更新時間：2026-03-10 12:30
+作者：AI Assistant
+修改摘要：Gemini LLM 全面改用新 SDK google.genai，移除 google.generativeai 依賴；維持 LLMService 介面不變
+更新時間：2026-03-09 20:05
+作者：AI Assistant
+修改摘要：抑制 google.generativeai 的 FutureWarning（棄用提示），避免干擾終端輸出
 更新時間：2025-12-26 15:35
 作者：AI Assistant
 修改摘要：修正 API Key 優先順序，改為 .env 檔案（Settings）優先，環境變數其次，確保專案配置一致性
@@ -33,12 +42,15 @@ from abc import ABC, abstractmethod
 from typing import Optional, AsyncGenerator
 from app.config import settings
 
-# 嘗試導入真實的 API SDK，如果失敗則使用 stub
+# 新版 Google GenAI SDK（用於 Gemini LLM）
 try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
+    from google import genai as genai_new  # type: ignore
+    from google.genai import types as genai_types  # type: ignore
+    GENAI_NEW_AVAILABLE = True
 except ImportError:
-    GEMINI_AVAILABLE = False
+    genai_new = None  # type: ignore
+    genai_types = None  # type: ignore
+    GENAI_NEW_AVAILABLE = False
 
 try:
     from openai import AsyncOpenAI
@@ -82,24 +94,21 @@ class GeminiLLM(BaseLLM):
         # 這樣可以確保專案配置的一致性，避免被系統環境變數覆蓋
         self.api_key = api_key or settings.GOOGLE_API_KEY or os.getenv("GOOGLE_API_KEY")
         self.logger = logging.getLogger("GeminiLLM")
-        self._model = None
-        self._use_real_api = GEMINI_AVAILABLE and self.api_key is not None
+        self._client = None
+        self._model_name = getattr(settings, "GEMINI_MODEL_NAME", "gemini-2.0-flash")
+        self._use_real_api = GENAI_NEW_AVAILABLE and self.api_key is not None
         
         if self._use_real_api:
             try:
-                genai.configure(api_key=self.api_key)
-                
-                # 使用 gemini-3.0-flash, gemini-1.5-flash (更快) 或 gemini-1.5-pro (更強)
-                # gemini-pro 已棄用，改用新模型名稱
-                model_name = getattr(settings, 'GEMINI_MODEL_NAME', 'gemini-3.0-flash')
-                self._model = genai.GenerativeModel(model_name)
-                self.logger.info(f"Gemini API initialized with API key, model: {model_name}")
+                # 初始化 google.genai Client
+                self._client = genai_new.Client(api_key=self.api_key)
+                self.logger.info(f"Gemini API (google.genai) initialized with model: {self._model_name}")
             except Exception as e:
-                self.logger.warning(f"Failed to initialize Gemini API: {e}, falling back to stub")
+                self.logger.warning(f"Failed to initialize google.genai Client: {e}, falling back to stub")
                 self._use_real_api = False
         else:
-            if not GEMINI_AVAILABLE:
-                self.logger.warning("google-generativeai not installed, using stub mode")
+            if not GENAI_NEW_AVAILABLE:
+                self.logger.warning("google-genai not installed, using stub mode")
             elif not self.api_key:
                 self.logger.warning("GOOGLE_API_KEY not configured, using stub mode")
     
@@ -111,19 +120,33 @@ class GeminiLLM(BaseLLM):
         max_retries: int = 1
     ) -> str:
         """生成回答"""
-        if self._use_real_api and self._model:
+        if self._use_real_api and self._client:
             for attempt in range(max_retries + 1):
                 try:
-                    # 使用真實的 Gemini API
-                    response = await asyncio.to_thread(
-                        self._model.generate_content,
-                        prompt,
-                        generation_config=genai.types.GenerationConfig(
+                    # 使用真實的 Gemini API（google.genai）；參數用 config=GenerateContentConfig，非 generation_config
+                    def _call():
+                        config = genai_types.GenerateContentConfig(
                             max_output_tokens=max_tokens,
-                            temperature=temperature
-                        )
-                    )
-                    return response.text
+                            temperature=temperature,
+                        ) if genai_types else None
+                        kwargs = {
+                            "model": self._model_name,
+                            "contents": prompt,
+                        }
+                        if config is not None:
+                            kwargs["config"] = config
+                        return self._client.models.generate_content(**kwargs)
+
+                    response = await asyncio.to_thread(_call)
+                    # google.genai 回傳物件通常有 candidates/text，這裡統一取第一個 text
+                    if hasattr(response, "text") and response.text:
+                        return response.text
+                    # 兼容未來可能結構
+                    if getattr(response, "candidates", None):
+                        text = getattr(response.candidates[0], "content", None)
+                        if text and getattr(text, "parts", None):
+                            return "".join(p.text for p in text.parts if getattr(p, "text", None))
+                    return ""
                 except Exception as e:
                     error_str = str(e)
                     
@@ -164,17 +187,21 @@ class GeminiLLM(BaseLLM):
     
     async def generate_chunk(self, prompt: str, max_retries: int = 1) -> AsyncGenerator[str, None]:
         """串流生成回答"""
-        if self._use_real_api and self._model:
+        if self._use_real_api and self._client:
             for attempt in range(max_retries + 1):
                 try:
-                    # 使用真實的 Gemini API 串流
-                    response = await asyncio.to_thread(
-                        self._model.generate_content,
-                        prompt,
-                        stream=True
-                    )
-                    for chunk in response:
-                        if chunk.text:
+                    # 使用真實的 Gemini API 串流（google.genai）；方法名為 generate_content_stream
+                    def _call_stream():
+                        config = genai_types.GenerateContentConfig() if genai_types else None
+                        kwargs = {"model": self._model_name, "contents": prompt}
+                        if config is not None:
+                            kwargs["config"] = config
+                        return self._client.models.generate_content_stream(**kwargs)
+
+                    # stream_generate_content 本身就是 iterable，同樣放到 to_thread 避免阻塞
+                    stream = await asyncio.to_thread(_call_stream)
+                    for chunk in stream:
+                        if hasattr(chunk, "text") and chunk.text:
                             yield chunk.text
                     return  # 成功，退出重試循環
                 except Exception as e:

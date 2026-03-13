@@ -2,6 +2,9 @@
 處理 PDF 文件並構建圖結構
 從 PDF 文件提取文字，新增到向量資料庫，並構建 GraphRAG 圖結構
 
+更新時間：2025-12-29 18:45
+作者：AI Assistant
+修改摘要：添加版權聲明過濾功能，自動移除「版權所有 非經授權請勿翻印」等非知識內容
 更新時間：2025-12-26 16:25
 作者：AI Assistant
 修改摘要：添加 --overwrite 選項，當重複處理相同來源 PDF 時，先刪除現有數據以避免重複
@@ -17,6 +20,7 @@ import sys
 import os
 import uuid
 import warnings
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -32,6 +36,51 @@ from app.core.entity_extractor import EntityExtractor
 from app.services.graph_builder import GraphBuilder
 from app.services.llm_service import LLMService
 from app.services.vector_service import VectorService
+
+
+def filter_copyright_text(text: str) -> str:
+    """
+    過濾版權聲明等非知識內容
+    
+    Args:
+        text: 原始文字內容
+    
+    Returns:
+        過濾後的文字內容
+    """
+    if not text:
+        return text
+    
+    # 常見的版權聲明模式（使用正則表達式）
+    copyright_patterns = [
+        r'版權所有[^\n]*非經授權[^\n]*翻印[^\n]*',
+        r'版權所有[^\n]*',
+        r'Copyright[^\n]*All[^\n]*Reserved[^\n]*',
+        r'非經授權[^\n]*請勿翻印[^\n]*',
+        r'請勿翻印[^\n]*',
+        r'All[^\n]*Rights[^\n]*Reserved[^\n]*',
+        r'©[^\n]*',
+        r'本文件[^\n]*版權所有[^\n]*',
+        r'本手冊[^\n]*版權所有[^\n]*',
+        r'本資料[^\n]*版權所有[^\n]*',
+    ]
+    
+    filtered_text = text
+    
+    # 移除版權聲明
+    for pattern in copyright_patterns:
+        filtered_text = re.sub(pattern, '', filtered_text, flags=re.IGNORECASE | re.MULTILINE)
+    
+    # 移除頁碼（單獨一行的數字）
+    filtered_text = re.sub(r'^\s*\d+\s*$', '', filtered_text, flags=re.MULTILINE)
+    
+    # 移除多餘的空白行（超過 3 個連續換行）
+    filtered_text = re.sub(r'\n{4,}', '\n\n\n', filtered_text)
+    
+    # 移除行首行尾空白
+    filtered_text = filtered_text.strip()
+    
+    return filtered_text
 
 # 嘗試導入 PDF 處理庫
 try:
@@ -70,7 +119,10 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 for i, page in enumerate(pdf.pages):
                     text = page.extract_text()
                     if text:
-                        text_content.append(text)
+                        # 過濾版權聲明
+                        text = filter_copyright_text(text)
+                        if text.strip():  # 只添加非空內容
+                            text_content.append(text)
                         if (i + 1) % 10 == 0:
                             print(f"  已處理 {i + 1} 頁...")
             return "\n\n".join(text_content)
@@ -89,7 +141,10 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                     for i, page in enumerate(pdf_reader.pages):
                         text = page.extract_text()
                         if text:
-                            text_content.append(text)
+                            # 過濾版權聲明
+                            text = filter_copyright_text(text)
+                            if text.strip():  # 只添加非空內容
+                                text_content.append(text)
                         if (i + 1) % 10 == 0:
                             print(f"  已處理 {i + 1} 頁...")
             return "\n\n".join(text_content)

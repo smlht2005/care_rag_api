@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../care_rag"
+		},
+		{
+			"path": "../medical_rag_api"
+		}
+	],
+	"settings": {}
+}

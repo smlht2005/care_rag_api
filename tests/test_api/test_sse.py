@@ -18,9 +18,9 @@ def test_sse_stream():
     assert "data:" in content
 
 def test_sse_stream_empty_query():
-    """測試空查詢的 SSE"""
+    """測試空查詢的 SSE：API 對空 query 回 422 Unprocessable Entity"""
     response = client.get("/api/v1/query/stream?query=")
-    assert response.status_code == 200
+    assert response.status_code == 422
 
 def test_sse_stream_format():
     """測試 SSE 格式"""
