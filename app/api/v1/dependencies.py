@@ -50,18 +50,6 @@ def get_cache_service() -> CacheService:
     return _cache_service
 
 
-def get_vector_service(
-    graph_store: GraphStore = Depends(get_graph_store)
-) -> VectorService:
-    """取得向量服務實例；graph_store 由 FastAPI 依賴注入，可覆寫。"""
-    global _vector_service
-    if _vector_service is None:
-        with _init_lock:
-            if _vector_service is None:
-                _vector_service = VectorService(graph_store=graph_store)
-    return _vector_service
-
-
 def get_graph_store() -> GraphStore:
     """取得 GraphStore 實例"""
     global _graph_store
@@ -73,6 +61,18 @@ def get_graph_store() -> GraphStore:
     return _graph_store
 
 
+def get_vector_service(
+    graph_store: GraphStore = Depends(get_graph_store)
+) -> VectorService:
+    """取得向量服務實例；graph_store 由 FastAPI 依賴注入，可覆寫。"""
+    global _vector_service
+    if _vector_service is None:
+        with _init_lock:
+            if _vector_service is None:
+                _vector_service = VectorService(graph_store=graph_store)
+    return _vector_service
+ 
+ 
 def get_rag_service(
     llm: LLMService = Depends(get_llm_service),
     cache: CacheService = Depends(get_cache_service),
