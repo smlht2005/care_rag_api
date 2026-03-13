@@ -38,6 +38,7 @@
 """
 import json
 import logging
+import os
 import re
 from typing import List, Dict, Any, Optional
 from app.core.graph_store import Entity, Relation
@@ -47,6 +48,12 @@ import uuid
 
 logger = logging.getLogger("EntityExtractor")
 
+# 確保 logs 目錄存在，供 debug.log 使用（避免在 prod 無 .cursor 目錄時寫檔失敗）
+try:
+    os.makedirs("logs", exist_ok=True)
+except Exception:
+    # 若建立失敗，不影響主流程，只是之後寫 log 可能失敗
+    pass
 
 class EntityExtractor:
     """實體和關係提取器"""

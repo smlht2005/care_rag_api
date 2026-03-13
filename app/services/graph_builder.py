@@ -3,11 +3,18 @@
 從文件內容構建圖結構
 """
 import logging
+import os
 from typing import Dict, List, Any, Optional
 from app.core.graph_store import GraphStore, Entity, Relation
 from app.core.entity_extractor import EntityExtractor
 
 logger = logging.getLogger("GraphBuilder")
+
+# 確保 logs 目錄存在，供 debug.log 使用
+try:
+    os.makedirs("logs", exist_ok=True)
+except Exception:
+    pass
 
 
 class GraphBuilder:
