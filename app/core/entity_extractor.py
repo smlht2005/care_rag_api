@@ -104,7 +104,7 @@ class EntityExtractor:
                     "data": {"response_preview": response[:200] if response else ""},
                     "timestamp": int(__import__("time").time() * 1000)
                 }
-                with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                with open("logs/debug.log", "a", encoding="utf-8") as f:
                     f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
                 # #endregion
                 # 降級到規則基礎提取
@@ -119,7 +119,7 @@ class EntityExtractor:
                     "data": {"entities_count": len(rule_based_entities) if rule_based_entities else 0},
                     "timestamp": int(__import__("time").time() * 1000)
                 }
-                with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                with open("logs/debug.log", "a", encoding="utf-8") as f:
                     f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
                 # #endregion
                 return rule_based_entities
@@ -138,7 +138,7 @@ class EntityExtractor:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             
@@ -158,7 +158,7 @@ class EntityExtractor:
                 "data": {"error": str(e), "error_type": type(e).__name__},
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             # 降級到規則基礎提取
@@ -173,7 +173,7 @@ class EntityExtractor:
                 "data": {"entities_count": len(rule_based_entities) if rule_based_entities else 0},
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             return rule_based_entities
@@ -208,7 +208,7 @@ class EntityExtractor:
             },
             "timestamp": int(__import__("time").time() * 1000)
         }
-        with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+        with open("logs/debug.log", "a", encoding="utf-8") as f:
             f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
         # #endregion
         
@@ -224,7 +224,7 @@ class EntityExtractor:
                 "data": {"entities_count": len(entities) if entities else 0},
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             return []
@@ -251,7 +251,7 @@ class EntityExtractor:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             
@@ -271,7 +271,7 @@ class EntityExtractor:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             
@@ -302,7 +302,7 @@ class EntityExtractor:
                     },
                     "timestamp": int(__import__("time").time() * 1000)
                 }
-                with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                with open("logs/debug.log", "a", encoding="utf-8") as f:
                     f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
                 # #endregion
                 return self._rule_based_relation_extraction(text, entities)
@@ -319,7 +319,7 @@ class EntityExtractor:
                 "data": {"error": str(e), "error_type": type(e).__name__},
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             # 降級到規則基礎提取
@@ -557,7 +557,7 @@ class EntityExtractor:
                         },
                         "timestamp": int(__import__("time").time() * 1000)
                     }
-                    with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                    with open("logs/debug.log", "a", encoding="utf-8") as f:
                         f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
                     return entities  # 返回空列表，觸發降級
                 else:
@@ -600,7 +600,7 @@ class EntityExtractor:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
         except Exception as e:
             self.logger.warning(f"Failed to parse entity response: {str(e)}")
@@ -619,7 +619,7 @@ class EntityExtractor:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
         
         return entities
@@ -759,7 +759,7 @@ class EntityExtractor:
                         },
                         "timestamp": int(__import__("time").time() * 1000)
                     }
-                    with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                    with open("logs/debug.log", "a", encoding="utf-8") as f:
                         f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
                     return relations  # 返回空列表，觸發降級
                 else:
@@ -831,7 +831,7 @@ class EntityExtractor:
                                         "data": unmatched_info,
                                         "timestamp": int(__import__("time").time() * 1000)
                                     }
-                                    with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                                    with open("logs/debug.log", "a", encoding="utf-8") as f:
                                         f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
                     
                     # 記錄解析摘要到 debug.log
@@ -852,7 +852,7 @@ class EntityExtractor:
                             },
                             "timestamp": int(__import__("time").time() * 1000)
                         }
-                        with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+                        with open("logs/debug.log", "a", encoding="utf-8") as f:
                             f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
         except json.JSONDecodeError as e:
             self.logger.debug(f"Failed to parse relation response as JSON: {str(e)}")
@@ -879,7 +879,7 @@ class EntityExtractor:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
         except Exception as e:
             self.logger.warning(f"Failed to parse relation response: {str(e)}")
@@ -900,7 +900,7 @@ class EntityExtractor:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
         
         # 記錄解析結果摘要
@@ -1021,7 +1021,7 @@ class EntityExtractor:
             },
             "timestamp": int(__import__("time").time() * 1000)
         }
-        with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+        with open("logs/debug.log", "a", encoding="utf-8") as f:
             f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
         # #endregion
         
@@ -1038,7 +1038,7 @@ class EntityExtractor:
                 "data": {"entities_count": len(entities) if entities else 0},
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             return relations
@@ -1167,7 +1167,7 @@ class EntityExtractor:
             },
             "timestamp": int(__import__("time").time() * 1000)
         }
-        with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+        with open("logs/debug.log", "a", encoding="utf-8") as f:
             f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
         # #endregion
         

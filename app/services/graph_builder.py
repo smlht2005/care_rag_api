@@ -84,7 +84,7 @@ class GraphBuilder:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             
@@ -104,7 +104,7 @@ class GraphBuilder:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             
@@ -138,7 +138,7 @@ class GraphBuilder:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             
@@ -167,7 +167,7 @@ class GraphBuilder:
                 },
                 "timestamp": int(__import__("time").time() * 1000)
             }
-            with open(".cursor/debug.log", "a", encoding="utf-8") as f:
+            with open("logs/debug.log", "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_data, ensure_ascii=False) + "\n")
             # #endregion
             
