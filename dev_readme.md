@@ -2,6 +2,20 @@
 
 ## 更新歷史
 
+### 2026-03-13 - AI Assistant - 整理 Git 分支與 PR Merge 操作文件
+
+**更新摘要：**
+新增 `docs/git_pr_merge/README.md`，整理本次 `feature/ic-query-qa-refactor` 從：
+- 分支命名與切分策略
+- 本機開發與 pytest 測試流程
+- GitHub 建立 PR、回應 code review、等待 CI 綠燈
+- 使用「Squash and merge」合併 PR（含刪除遠端 feature 分支）
+- 合併後本機同步與再次驗證
+
+作為未來在 GitHub 手動操作分支與 PR 的標準流程說明文件。
+
+---
+
 ### 2026-03-11 - AI Assistant - PR Review 修正全部完成（skip_cache 測試、StubEmbedding deterministic、deps lambda 修正）
 
 **更新摘要：**

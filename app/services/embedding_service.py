@@ -1,5 +1,8 @@
 """
 Embedding 服務抽象層
+更新時間：2026-03-13
+作者：AI Assistant
+修改摘要：GoogleGenAIEmbeddingService.embed() 依 API 上限每批最多 100 筆分批呼叫 embed_content，再合併結果，避免 IC 檔 329 筆 QA 一次送出導致 400 INVALID_ARGUMENT
 更新時間：2026-03-11 14:30
 作者：AI Assistant
 修改摘要：StubEmbeddingService 改用 hashlib.sha256 確保跨進程 deterministic（修正 Python hash randomization 問題）
@@ -42,6 +45,9 @@ from typing import List, Optional
 from app.config import settings
 
 logger = logging.getLogger("EmbeddingService")
+
+# Google GenAI API 單批最多 100 筆（at most 100 requests can be in one batch），超過會 400 INVALID_ARGUMENT
+_GENAI_EMBED_BATCH_SIZE = 100
 
 # 新版 SDK（google.genai）
 try:
@@ -129,7 +135,15 @@ class GoogleGenAIEmbeddingService(BaseEmbeddingService):
                 logger.warning(f"Google GenAI embedding 發生錯誤，降級為 stub：{e}")
             return []
 
-        return await asyncio.to_thread(_embed_batch, texts)
+        # API 單批最多 100 筆，超過會 400；分批呼叫再合併結果
+        all_vectors: List[List[float]] = []
+        for i in range(0, len(texts), _GENAI_EMBED_BATCH_SIZE):
+            sub_batch = texts[i : i + _GENAI_EMBED_BATCH_SIZE]
+            chunk_vectors = await asyncio.to_thread(_embed_batch, sub_batch)
+            if not chunk_vectors or len(chunk_vectors) != len(sub_batch):
+                return []
+            all_vectors.extend(chunk_vectors)
+        return all_vectors
 
 
 class StubEmbeddingService(BaseEmbeddingService):

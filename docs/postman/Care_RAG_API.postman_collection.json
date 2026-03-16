@@ -191,6 +191,105 @@
 					"response": []
 				},
 				{
+					"name": "Query - 門診批價 如何查詢病患掛號紀錄",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"門診批價作業中，如何查詢某病患當日掛號紀錄？\",\n  \"top_k\": 5,\n  \"skip_cache\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/query",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "query"]
+						},
+						"description": "針對《衛生所門診批價管理系統操作指引》驗證批價掛號紀錄相關 QA 是否正確寫入 graph.db 與向量。"
+					},
+					"response": []
+				},
+				{
+					"name": "Query - 病歷掛號 如何補掛號",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"若病患忘記掛號，如何在病歷與掛號系統中補掛號？\",\n  \"top_k\": 5,\n  \"skip_cache\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/query",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "query"]
+						},
+						"description": "針對《衛生所病歷與掛號系統操作指南》驗證補掛號流程相關 QA 是否正確寫入 graph.db 與向量。"
+					},
+					"response": []
+				},
+				{
+					"name": "Query - 醫令系統 如何開立慢箋",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"在衛生所醫令系統中，如何開立慢性病連續處方箋？\",\n  \"top_k\": 5,\n  \"skip_cache\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/query",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "query"]
+						},
+						"description": "針對《衛生所醫令系統操作指南與常見問題彙編》驗證慢性病連續處方箋相關 QA 是否正確寫入 graph.db 與向量。"
+					},
+					"response": []
+				},
+				{
 					"name": "SSE Stream Query",
 					"request": {
 						"method": "GET",
@@ -568,6 +667,118 @@
 							"path": ["api", "v1", "qa", "search"]
 						},
 						"description": "在指定文件中搜尋 QA"
+					},
+					"response": []
+				},
+				{
+					"name": "Search QA - 門診批價 掛號紀錄",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"門診批價 掛號紀錄 查詢\",\n  \"limit\": 10,\n  \"doc_id\": \"門診批價qa\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/qa/search",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "qa", "search"]
+						},
+						"description": "在《衛生所門診批價管理系統操作指引》對應的 QA 文件中，搜尋掛號紀錄相關 QA。"
+					},
+					"response": []
+				},
+				{
+					"name": "Search QA - 病歷掛號 補掛號流程",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"補掛號 流程\",\n  \"limit\": 10,\n  \"doc_id\": \"掛號qa\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/qa/search",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "qa", "search"]
+						},
+						"description": "在《衛生所病歷與掛號系統操作指南》對應的 QA 文件中，搜尋補掛號流程相關 QA。"
+					},
+					"response": []
+				},
+				{
+					"name": "Search QA - 醫令 慢箋 開立",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"醫令 慢箋 開立\",\n  \"limit\": 10,\n  \"doc_id\": \"醫令qa\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/qa/search",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "qa", "search"]
+						},
+						"description": "在《衛生所醫令系統操作指南與常見問題彙編》對應的 QA 文件中，搜尋慢性病連續處方箋相關 QA。"
+					},
+					"response": []
+				},
+				{
+					"name": "Search QA - IC卡錯誤碼 D12",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"query\": \"IC卡 D12 錯誤\",\n  \"limit\": 10\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/qa/search",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "qa", "search"]
+						},
+						"description": "使用 IC 卡錯誤碼 D12 測試 QA 搜尋（驗證 Thisqa IC 圖與 QA 向量是否正確建立）"
 					},
 					"response": []
 				},
