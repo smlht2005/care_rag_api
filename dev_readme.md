@@ -2,6 +2,31 @@
 
 ## 更新歷史
 
+### 2026-03-17 - AI Assistant - IC/QA 前端單一面板整合與 UI/UX 調整
+
+**更新摘要：**
+- 將原本左右分欄（左：對話、右：Answer/Sources/Raw JSON 分頁）改為單一整合面板：同一畫面內顯示對話與每則回覆的完整結果。
+- 新增 `frontend/src/components/ICQaConversation.tsx`：依 `turns` 渲染使用者氣泡與助理卡片；助理卡片內含回答主文、可展開的「顯示來源 / QA 結果」與「Raw JSON」（MUI Collapse + 按鈕），錯誤以 Alert 顯示於該則卡片內。
+- `ICQaConsolePage` 改為維護 `turns` 狀態（id、userText、response、error），送出時呼叫 `runQuery` 並將回傳結果 push 進 turns；移除右側 Tabs 與獨立結果區塊。
+- 查詢設定改為頂部單列（模式、Top K、清除對話按鈕），節省空間。
+- `useIcQaQuery.runQuery` 改為回傳 `RunQueryResult`（answer、response、error），不再 throw，方便頁面組 turn。
+- 間距與階層：8px 網格、回答主文較醒目、展開區使用 borderTop/divider，並提供「清除對話」按鈕。
+
+---
+
+### 2026-03-17 - AI Assistant - 前端 Vite + React + MUI 安裝與 main.tsx 掛載 root
+
+**更新摘要：**
+- 在 `frontend/` 建立 Vite + React + TypeScript 專案：新增 `package.json`、`index.html`、`vite.config.ts`、`tsconfig.json`、`tsconfig.node.json`、`src/vite-env.d.ts`。
+- `index.html` 提供 `<div id="root"></div>`，並以 `<script type="module" src="/src/main.tsx"></script>` 載入入口；`main.tsx` 使用 `ReactDOM.createRoot(document.getElementById("root")!)` 掛載 App。
+- 依賴：React 18、@mui/material、@emotion/react、@emotion/styled、@mui/icons-material、Vite 5、TypeScript 5.2。
+- 開發代理：Vite `server.proxy` 將 `/api` 轉到 `http://localhost:8000`。
+- 建置與執行：`npm install` 後於 `frontend` 目錄執行 `npm run dev`（埠 5173）或 `npm run build`。Script 使用 `node node_modules/vite/bin/vite.js` 以在 Windows 下正常執行。
+- 修正：ChatPanel 送出後顯示後端 answer（`useIcQaQuery.runQuery` 回傳 answer 字串；ICQaChatPanel 依 onSend 回傳值追加助理訊息）。
+- 追加修正：MUI icons 匯入錯誤根因為 `vite.config.ts` 中對 `@mui/icons-material/Send` 的錯誤 alias，已移除該 alias 與多餘的 `exclude: ["@mui/icons-material"]`，改回標準匯入路徑 `import SendIcon from "@mui/icons-material/Send"` 並經 `npm run dev`/build 驗證通過。
+
+---
+
 ### 2026-03-13 - AI Assistant - 整理 Git 分支與 PR Merge 操作文件
 
 **更新摘要：**
