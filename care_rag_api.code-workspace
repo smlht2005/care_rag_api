@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../medical_rag_api"
+		},
+		{
+			"path": "../../../../HISCore/notebooklmWeb/frontend"
 		}
 	],
 	"settings": {}
