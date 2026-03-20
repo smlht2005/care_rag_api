@@ -61,8 +61,9 @@ export function useIcQaQuery(options: UseIcQaQueryOptions): UseIcQaQueryResult {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            // 若後端啟用 X-API-Key，可在此注入或改為從環境變數 / 設定讀取
-            "X-API-Key": "test-api-key",
+            ...(import.meta.env.VITE_API_KEY
+              ? { "X-API-Key": import.meta.env.VITE_API_KEY }
+              : {}),
           },
           body: JSON.stringify(body),
         });

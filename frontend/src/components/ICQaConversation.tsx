@@ -1,4 +1,4 @@
-import { useState, KeyboardEvent } from "react";
+import { useState, useEffect, useRef, KeyboardEvent } from "react";
 import {
   Alert,
   Box,
@@ -124,6 +124,11 @@ export function ICQaConversation({ turns, loading, mode, onSend }: ICQaConversat
   const [input, setInput] = useState("");
   const [sourcesOpen, setSourcesOpen] = useState<Record<string, boolean>>({});
   const [rawOpen, setRawOpen] = useState<Record<string, boolean>>({});
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [turns, loading]);
 
   const toggleSources = (id: string) => {
     setSourcesOpen((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -293,6 +298,7 @@ export function ICQaConversation({ turns, loading, mode, onSend }: ICQaConversat
               </Typography>
             </Box>
           )}
+          <div ref={bottomRef} />
         </Stack>
       </Box>
       <Box sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}>
