@@ -39,6 +39,8 @@ ENV/
 
 # Logs
 *.log
+# Cursor IDE / Agent 執行期日誌（明確排除 .cursor 下之 .log，勿提交）
+.cursor/*.log
 
 # Docker
 .dockerignore

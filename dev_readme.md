@@ -2,6 +2,39 @@
 
 ## 更新歷史
 
+### 2026-03-20 13:33 - AI Assistant - 正式區複製清單（missfind 修復）
+
+**更新摘要：**
+- 新增 `docs/deploy/COPY_TO_PROD_missfind_fix.md`：列出必備／建議複製之相對路徑、`copy` 範例與重啟驗證步驟，供複製到 prd（如 `172.31.6.123:8002`）時對照。
+
+---
+
+### 2026-03-20 12:10 - AI Assistant - 修復 graph 關鍵字假陽性（missfind / Organization 撞 type）
+
+**更新摘要：**
+- `GraphStore.search_entities` 新增關鍵字參數 `include_type_match`（預設 `True`）；`False` 時僅 `name` 子字串匹配。`SQLiteGraphStore`／`MemoryGraphStore` 已實作；`ORDER BY name`（SQLite）與記憶體版排序對齊以利穩定結果。
+- `VectorService._search_from_graph` 改使用 `include_type_match=False`；graph 來源 `score` 改為 `0.35`，`metadata.score_source=graph_keyword`。
+- 說明文件：`docs/bug/missfind.md` 增補「十、解法」；後續增補「6. 本機開發怎麼測（dev）」（pytest、`scripts/verify_missfind_graph_fallback.py`、uvicorn、Postman/PowerShell）。
+- 手動驗證：`python scripts/verify_missfind_graph_fallback.py` 預期 `graph keyword hits: 0`；`pytest tests/test_core/` 全綠。
+
+---
+
+### 2026-03-20 12:05 - AI Assistant - .gitignore 明確排除 `.cursor/*.log`
+
+**更新摘要：**
+- 在 `# Logs` 區塊新增 `.cursor/*.log` 與註解（專案既有 `*.log` 已會忽略 `debug.log`；此條為語意明確與防未來規則調整時遺漏）。
+
+---
+
+### 2026-03-20 12:01 - AI Assistant - Cursor Ruler：變更分級、備份與專案規則檔
+
+**更新摘要：**
+- 新增 `.cursor/rules/care-rag-change-governance.mdc`（`alwaysApply: true`）：T0–T3 變更分級、T1 預授權（RAG/Graph 假陽性／誤導分數／無來源硬答）、ECR 與 SSOT 並存、批次自動化 vs 對話任務、SSOT 缺口以 ADR/dev_readme 補預設行為。
+- 新增 `.cursor/RULER_SUMMARY.md`：結論、Pros/Cons、檔案位置與還原方式。
+- 備份導入前狀態：`.cursor/backups/ruler-before-tier-2026-03-20/`（README、INVENTORY、`user-rules-legacy-snapshot.md`）；當時 repo 內尚無 `.mdc`，僅盤點既有 `debug.log` 等）。
+
+---
+
 ### 2026-03-17 - AI Assistant - IC/QA 前端單一面板整合與 UI/UX 調整
 
 **更新摘要：**

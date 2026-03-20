@@ -1,6 +1,10 @@
 """
 GraphRAG 圖結構儲存系統
 
+更新時間：2026-03-20 12:10
+作者：AI Assistant
+修改摘要：search_entities 新增參數 include_type_match（預設 True 維持相容）；False 時僅比對 name，避免查詢 token 與圖譜 type（如 Organization）誤匹配造成假陽性（見 docs/bug/missfind.md）
+
 更新時間：2025-12-29 18:37
 作者：AI Assistant
 修改摘要：添加 get_all_entities() 和 get_all_relations() 方法，支援獲取所有實體和關係
@@ -152,8 +156,14 @@ class GraphStore(ABC):
         pass
     
     @abstractmethod
-    async def search_entities(self, query: str, limit: int = 10) -> List[Entity]:
-        """搜尋實體"""
+    async def search_entities(
+        self, query: str, limit: int = 10, *, include_type_match: bool = True
+    ) -> List[Entity]:
+        """
+        搜尋實體。
+        include_type_match=True：name 或 type 子字串匹配（既有行為）。
+        include_type_match=False：僅 name 匹配；供 graph 關鍵字 fallback，避免英文 token 命中 schema 類名。
+        """
         pass
     
     @abstractmethod
@@ -469,15 +479,26 @@ class SQLiteGraphStore(GraphStore):
             self.logger.error(f"Failed to get entities by type: {str(e)}")
             return []
     
-    async def search_entities(self, query: str, limit: int = 10) -> List[Entity]:
-        """搜尋實體（依名稱）"""
+    async def search_entities(
+        self, query: str, limit: int = 10, *, include_type_match: bool = True
+    ) -> List[Entity]:
+        """搜尋實體；include_type_match=False 時僅依 name LIKE 匹配。"""
         try:
             async with self.conn.cursor() as cursor:
-                await cursor.execute("""
-                    SELECT * FROM entities 
-                    WHERE name LIKE ? OR type LIKE ?
-                    LIMIT ?
-                """, (f"%{query}%", f"%{query}%", limit))
+                if include_type_match:
+                    await cursor.execute("""
+                        SELECT * FROM entities 
+                        WHERE name LIKE ? OR type LIKE ?
+                        ORDER BY name
+                        LIMIT ?
+                    """, (f"%{query}%", f"%{query}%", limit))
+                else:
+                    await cursor.execute("""
+                        SELECT * FROM entities 
+                        WHERE name LIKE ?
+                        ORDER BY name
+                        LIMIT ?
+                    """, (f"%{query}%", limit))
                 rows = await cursor.fetchall()
                 
                 return [
@@ -921,13 +942,17 @@ class MemoryGraphStore(GraphStore):
         """依類型查詢實體"""
         return [e for e in self.entities.values() if e.type == entity_type][:limit]
     
-    async def search_entities(self, query: str, limit: int = 10) -> List[Entity]:
-        """搜尋實體"""
+    async def search_entities(
+        self, query: str, limit: int = 10, *, include_type_match: bool = True
+    ) -> List[Entity]:
+        """搜尋實體；include_type_match=False 時僅比對 name。"""
         results = []
         query_lower = query.lower()
-        
-        for entity in self.entities.values():
-            if query_lower in entity.name.lower() or query_lower in entity.type.lower():
+        # 穩定順序：依 name 排序後掃描（與 SQLite ORDER BY name 對齊）
+        for entity in sorted(self.entities.values(), key=lambda e: (e.name or "").lower()):
+            name_hit = query_lower in entity.name.lower()
+            type_hit = include_type_match and (query_lower in entity.type.lower())
+            if name_hit or type_hit:
                 results.append(entity)
                 if len(results) >= limit:
                     break
