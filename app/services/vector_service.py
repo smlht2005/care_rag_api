@@ -1,5 +1,8 @@
 """
 向量檢索服務
+更新時間：2026-03-20 12:10
+作者：AI Assistant
+修改摘要：_search_from_graph 改呼叫 search_entities(..., include_type_match=False) 僅比對實體 name，避免 Organization 等 token 命中 type 假陽性；graph 來源 score 改為較低常數並於 metadata 標示 score_source=graph_keyword（見 docs/bug/missfind.md）
 更新時間：2026-03-11 10:30
 作者：AI Assistant
 修改摘要：重構 IC 代碼查詢邏輯，新增 _extract_ic_code() 統一前處理器，以「IC 卡上下文 + 代碼格式」為唯一判斷依據，完全移除對中文語境詞彙的依賴，修正 AD61 裸碼不同說法查詢失敗問題
@@ -262,7 +265,9 @@ class VectorService:
         for kw in keywords[:5]:
             if len(results) >= top_k:
                 break
-            entities = await self.graph_store.search_entities(kw, limit=top_k)
+            entities = await self.graph_store.search_entities(
+                kw, limit=top_k, include_type_match=False
+            )
             for e in entities:
                 if e.id in seen_ids:
                     continue
@@ -275,11 +280,17 @@ class VectorService:
                         elif isinstance(v, (list, dict)) and str(v).strip():
                             content_parts.append(str(v)[:1500])
                 content = "\n".join(content_parts) or e.name
+                # 非向量相似度，僅供排序用；勿解讀為語意信心度
                 results.append({
                     "id": e.id,
                     "content": content,
-                    "score": 0.85,
-                    "metadata": {"source": "graph", "type": e.type, "properties": e.properties},
+                    "score": 0.35,
+                    "metadata": {
+                        "source": "graph",
+                        "score_source": "graph_keyword",
+                        "type": e.type,
+                        "properties": e.properties,
+                    },
                 })
                 if len(results) >= top_k:
                     break
