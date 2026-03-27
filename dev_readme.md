@@ -2,6 +2,13 @@
 
 ## 更新歷史
 
+### 2026-03-27 16:29 - AI Assistant - 負向測試改用 /api/v1/query 驗證
+
+**更新摘要：**
+- 更新 `.github/workflows/wif-deploy.yml`：負向測試由 `/api/v1/health/` 改為 `POST /api/v1/query`，並調整斷言為「不得 200；若為 401 且 `www-authenticate` 含 `invalid_token` 視為命中預期」。
+
+---
+
 ### 2026-03-27 16:21 - AI Assistant - 強化 WIF 負向測試斷言
 
 **更新摘要：**
