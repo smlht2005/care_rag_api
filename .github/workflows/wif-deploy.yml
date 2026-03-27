@@ -42,8 +42,11 @@ jobs:
           CLOUD_RUN_URL: https://care-rag-api-441535054378.asia-east1.run.app/invalid-audience-for-negative-test
           HEALTH_URL: https://care-rag-api-441535054378.asia-east1.run.app/api/v1/health/
           X_API_KEY: test-api-key
+          EXPECT_NEGATIVE_TEST: "true"
         run: |
           python - <<'PY'
+          import base64
+          import json
           import os
           import google.auth
           import requests
@@ -66,11 +69,31 @@ jobs:
           token = id_creds.token
           print(f"token_prefix={token[:20]}..., token_len={len(token)}")
 
+          # Decode JWT payload (without signature verification) for audience assertion.
+          payload_b64 = token.split(".")[1]
+          payload_b64 += "=" * (-len(payload_b64) % 4)
+          payload = json.loads(base64.urlsafe_b64decode(payload_b64.encode("utf-8")).decode("utf-8"))
+          token_aud = payload.get("aud")
+          print("token_audience=", token_aud)
+
+          expected_aud = os.environ["CLOUD_RUN_URL"]
+          if token_aud != expected_aud:
+              raise SystemExit(f"[FAIL] token aud mismatch, expected {expected_aud}, got {token_aud}")
+
           headers = {"Authorization": f"Bearer {token}", "X-API-Key": os.environ["X_API_KEY"]}
           r = requests.get(os.environ["HEALTH_URL"], headers=headers, timeout=30)
           print("health_status=", r.status_code)
           print("health_body=", r.text[:300])
-          r.raise_for_status()
+
+          if os.environ.get("EXPECT_NEGATIVE_TEST", "false").lower() == "true":
+              auth_header = r.headers.get("www-authenticate", "")
+              if r.status_code != 401:
+                  raise SystemExit(f"[FAIL] negative test expected 401, got {r.status_code}")
+              if "invalid_token" not in auth_header.lower():
+                  raise SystemExit("[FAIL] negative test expected invalid_token in www-authenticate")
+              print("[PASS] negative test confirmed: 401 invalid_token")
+          else:
+              r.raise_for_status()
           PY
       
 

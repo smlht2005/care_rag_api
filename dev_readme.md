@@ -2,6 +2,13 @@
 
 ## 更新歷史
 
+### 2026-03-27 16:21 - AI Assistant - 強化 WIF 負向測試斷言
+
+**更新摘要：**
+- 更新 `.github/workflows/wif-deploy.yml`：在負向測試模式新增 JWT `aud` 檢查，並強制驗證 `/health/` 回應需為 `401` 且 `www-authenticate` 含 `invalid_token`；若未命中即 fail。
+
+---
+
 ### 2026-03-27 16:01 - AI Assistant - WIF 負向測試分支：故意錯誤 audience
 
 **更新摘要：**
