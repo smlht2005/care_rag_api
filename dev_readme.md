@@ -2,6 +2,67 @@
 
 ## 更新歷史
 
+### 2026-03-27 15:36 - AI Assistant - 修正 WIF workflow 的 Python ID token 取得流程
+
+**更新摘要：**
+- 更新 `.github/workflows/wif-deploy.yml`：將 `fetch_id_token(..., credentials=...)` 改為 `impersonated_credentials.IDTokenCredentials(...).refresh()`，避免 `google-auth` 相容性錯誤；同步整理 YAML 縮排。
+
+---
+
+### 2026-03-27 13:51 - AI Assistant - 同步 WIF 雙 SA 排錯清單到部署文件
+
+**更新摘要：**
+- 更新 `docs/gcp_deployment/python_id_token_cloud_run_plan.md`：新增「雙 SA 逐步檢查指令清單（排錯優先）」含 Provider、`workloadIdentityUser`、`TokenCreator`、`run.invoker` 與 audience 一致性檢核。
+
+---
+
+### 2026-03-27 13:21 - AI Assistant - GCP 部署：Python ID token 計畫存檔
+
+**更新摘要：**
+- 新增 `docs/gcp_deployment/python_id_token_cloud_run_plan.md`：將 gcloud 取 ID token 轉 Python（方案 B）、ADC／WIF（CI/Prod）與驗證矩陣之實作計畫存於 repo，並與同目錄 `get-id-token-for-postman.md` 等文件交叉引用。
+
+---
+
+### 2026-03-27 09:10 - AI Assistant - 修正 Windows 上 Python 呼叫 gcloud 之 WinError 2 說明
+
+**更新摘要：**
+- 更新 `docs/postman/Care_RAG_API_CloudRun_IAM.postman_README.md`、`docs/gcp_deployment/get-id-token-for-postman.md`：改為建議 `shutil.which('gcloud'/'gcloud.cmd')` 或 `shell=True`；並在 `cloud-run-troubleshooting-summary.md` 增補 WinError 2 根因。
+
+---
+
+### 2026-03-27 08:59 - AI Assistant - gcloud ID token：文件與 Python 一行指令
+
+**更新摘要：**
+- 新增 `docs/gcp_deployment/get-id-token-for-postman.md`：彙整 CMD / Python 產生 ID token 供 Postman `bearerToken`。
+- 更新 `docs/postman/Care_RAG_API_CloudRun_IAM.postman_README.md`：補上 Python 一行產生 token。
+
+---
+
+### 2026-03-26 17:00 - AI Assistant - Postman Cloud Run IAM：Environment + 使用說明
+
+**更新摘要：**
+- 新增 `docs/postman/Care_RAG_API_CloudRun_IAM.postman_environment.json`（`baseUrl`、`bearerToken`、`xApiKey`）。
+- 新增 `docs/postman/Care_RAG_API_CloudRun_IAM.postman_README.md`：匯入步驟與 gcloud 產生 ID token 貼入 Postman 之流程。
+
+---
+
+### 2026-03-26 16:25 - AI Assistant - 新增 Cloud Run IAM 專用 Postman Collection
+
+**更新摘要：**
+- 新增 `docs/postman/Care_RAG_API_CloudRun_IAM.postman_collection.json`，包含 Cloud Run IAM only 測試用 `GET /api/v1/health/` 與 `POST /api/v1/query`。
+- Collection 變數預設加入 `baseUrl`、`bearerToken`、`xApiKey`，可直接匯入 Postman 後填 token 測試。
+
+---
+
+### 2026-03-26 14:25 - AI Assistant - Cloud Run 部署準備（Dockerfile 8002 + 內建 DB + .dockerignore）
+
+**更新摘要：**
+- 新增 `.dockerignore`：排除 `.env`、`.git`、`__pycache__`、logs 與 node_modules，避免 Build context 帶入秘密或垃圾檔。
+- 更新 `Dockerfile`：API 埠統一 8002（`EXPOSE 8002`、uvicorn 讀 `PORT` fallback 8002）、HEALTHCHECK 改用 `httpx`、並將 `data/` 的 `graph_qa.db`/`graph.db`/`qa_vectors.db` 內建進映像（Cloud Run 不再缺檔）。
+- 新增部署文件：`docs/deploy/cloud-run-access-iam-vpc-summary.md`、`docs/deploy/cloud-run-env-secrets-guide.md`、`docs/deploy/cloud-run-deploy-plan.md`。
+
+---
+
 ### 2026-03-20 13:33 - AI Assistant - 正式區複製清單（missfind 修復）
 
 **更新摘要：**

@@ -1,0 +1,77 @@
+name: wif-deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  verify-wif:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auth to GCP via WIF
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/441535054378/locations/global/workloadIdentityPools/github-actions-pool/providers/github-oidc
+          service_account: ci-wif@gen-lang-client-0567547134.iam.gserviceaccount.com
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Verify identity
+        run: |
+          gcloud auth list
+          gcloud config list account
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-auth requests
+
+      - name: Verify double-SA token flow by Python
+        env:
+          INVOKER_SA: 441535054378-compute@developer.gserviceaccount.com
+          CLOUD_RUN_URL: https://care-rag-api-441535054378.asia-east1.run.app
+          HEALTH_URL: https://care-rag-api-441535054378.asia-east1.run.app/api/v1/health/
+          X_API_KEY: test-api-key
+        run: |
+          python - <<'PY'
+          import os
+          import google.auth
+          import requests
+          from google.auth import impersonated_credentials
+          from google.auth.transport.requests import Request
+
+          source_creds, _ = google.auth.default()
+          target_creds = impersonated_credentials.Credentials(
+              source_credentials=source_creds,
+              target_principal=os.environ["INVOKER_SA"],
+              target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+              lifetime=3600,
+          )
+          id_creds = impersonated_credentials.IDTokenCredentials(
+              target_credentials=target_creds,
+              target_audience=os.environ["CLOUD_RUN_URL"],
+              include_email=True,
+          )
+          id_creds.refresh(Request())
+          token = id_creds.token
+          print(f"token_prefix={token[:20]}..., token_len={len(token)}")
+
+          headers = {"Authorization": f"Bearer {token}", "X-API-Key": os.environ["X_API_KEY"]}
+          r = requests.get(os.environ["HEALTH_URL"], headers=headers, timeout=30)
+          print("health_status=", r.status_code)
+          print("health_body=", r.text[:300])
+          r.raise_for_status()
+          PY
+      
+
+      

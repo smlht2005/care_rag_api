@@ -1,0 +1,31 @@
+# Cloud Build upload ignore rules for `gcloud builds submit`.
+#
+# Note: this repo's `.gitignore` ignores `*.db`, but Cloud Build needs
+# `data/*.db` included for the container image (graph/vector DBs).
+
+.git
+.gitignore
+.cursor
+.spec-workflow
+.pytest_cache
+.vscode
+.idea
+
+__pycache__/
+*.pyc
+*.pyo
+
+venv/
+env/
+.venv/
+
+.env
+.env.*
+!.env.example
+
+logs/
+*.log
+
+frontend/node_modules/
+**/node_modules/
+frontend/dist/

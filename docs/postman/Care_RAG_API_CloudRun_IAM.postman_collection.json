@@ -1,0 +1,95 @@
+{
+  "info": {
+    "_postman_id": "d5fb8f34-e7d4-4ea3-8d37-c6fcb6d0d5a4",
+    "name": "Care RAG API Cloud Run IAM",
+    "description": "Cloud Run (IAM only) testing collection for care-rag-api. Updated: 2026-03-26 16:25",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health (IAM only)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearerToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/health/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "health",
+            ""
+          ]
+        },
+        "description": "Use trailing slash to avoid redirect behavior."
+      },
+      "response": []
+    },
+    {
+      "name": "Query (IAM + X-API-Key)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearerToken}}",
+            "type": "text"
+          },
+          {
+            "key": "X-API-Key",
+            "value": "{{xApiKey}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"門診批價作業中，如何查詢某病患當日掛號紀錄？\",\n  \"top_k\": 5,\n  \"skip_cache\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/query",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "query"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://care-rag-api-441535054378.asia-east1.run.app"
+    },
+    {
+      "key": "bearerToken",
+      "value": ""
+    },
+    {
+      "key": "xApiKey",
+      "value": "test-api-key"
+    }
+  ]
+}

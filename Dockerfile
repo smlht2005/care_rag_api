@@ -21,13 +21,16 @@ COPY ./app ./app
 # 建立資料目錄
 RUN mkdir -p /app/data
 
+# 複製預建資料庫（Graph/QA/Vector）
+COPY ./data/graph_qa.db ./data/graph.db ./data/qa_vectors.db /app/data/
+
 # 暴露端口
-EXPOSE 8080 8001
+EXPOSE 8002 8001
 
 # 健康檢查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8080/api/v1/health')" || exit 1
+    CMD python -c "import httpx; r=httpx.get('http://127.0.0.1:8002/api/v1/health'); r.raise_for_status()" || exit 1
 
 # 啟動命令
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8002}"]
 
