@@ -2,6 +2,13 @@
 
 ## 更新歷史
 
+### 2026-03-27 16:01 - AI Assistant - WIF 負向測試分支：故意錯誤 audience
+
+**更新摘要：**
+- 在測試分支 `test/wif-negative-audience` 更新 `.github/workflows/wif-deploy.yml`：將 `CLOUD_RUN_URL` 改為錯誤 audience，供階段 7 負向測試驗證預期 `401 invalid_token` 行為。
+
+---
+
 ### 2026-03-27 15:36 - AI Assistant - 修正 WIF workflow 的 Python ID token 取得流程
 
 **更新摘要：**

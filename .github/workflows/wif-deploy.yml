@@ -39,7 +39,7 @@ jobs:
       - name: Verify double-SA token flow by Python
         env:
           INVOKER_SA: 441535054378-compute@developer.gserviceaccount.com
-          CLOUD_RUN_URL: https://care-rag-api-441535054378.asia-east1.run.app
+          CLOUD_RUN_URL: https://care-rag-api-441535054378.asia-east1.run.app/invalid-audience-for-negative-test
           HEALTH_URL: https://care-rag-api-441535054378.asia-east1.run.app/api/v1/health/
           X_API_KEY: test-api-key
         run: |
