@@ -2,6 +2,13 @@
 
 ## 更新歷史
 
+### 2026-03-27 16:42 - AI Assistant - 負向測試 audience 改為跨網域
+
+**更新摘要：**
+- 更新 `.github/workflows/wif-deploy.yml`：負向測試 `CLOUD_RUN_URL` 改為 `https://example.com`，避免同服務 URL + path 仍可能被接受，提升 `401 invalid_token` 命中穩定性。
+
+---
+
 ### 2026-03-27 16:29 - AI Assistant - 負向測試改用 /api/v1/query 驗證
 
 **更新摘要：**
