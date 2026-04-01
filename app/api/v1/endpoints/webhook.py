@@ -280,11 +280,24 @@ async def line_query_webhook(
             ).model_dump(),
         )
 
-    auth = CloudRunAuthService()
-    token = auth.get_id_token(
-        target_audience=settings.LINE_PROXY_TARGET_AUDIENCE,
-        invoker_service_account=settings.LINE_PROXY_INVOKER_SERVICE_ACCOUNT,
-    )
+    try:
+        auth = CloudRunAuthService()
+        token = auth.get_id_token(
+            target_audience=settings.LINE_PROXY_TARGET_AUDIENCE,
+            invoker_service_account=settings.LINE_PROXY_INVOKER_SERVICE_ACCOUNT,
+        )
+    except Exception as exc:
+        logger.error("Failed to mint Cloud Run ID token: %s", str(exc))
+        return JSONResponse(
+            status_code=500,
+            content=LineWebhookProxyResponse(
+                status="error",
+                event_id=event_id,
+                forwarded=False,
+                query=query_text,
+                detail=f"auth error: {type(exc).__name__}",
+            ).model_dump(),
+        )
     proxy_api_key = settings.LINE_PROXY_X_API_KEY or settings.API_KEY
 
     query_status: Optional[int] = None

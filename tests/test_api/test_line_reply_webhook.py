@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -58,7 +59,6 @@ def _settings_defaults(monkeypatch):
 
 def test_line_webhook_signed_triggers_reply_and_forward(monkeypatch):
     body = _payload()
-    import json
 
     raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     sig = _sign(raw, settings.LINE_CHANNEL_SECRET)
@@ -96,7 +96,6 @@ def test_line_webhook_signed_triggers_reply_and_forward(monkeypatch):
 
 def test_line_webhook_reply_failure_does_not_break(monkeypatch):
     body = _payload()
-    import json
 
     raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     sig = _sign(raw, settings.LINE_CHANNEL_SECRET)
@@ -130,3 +129,75 @@ def test_line_webhook_reply_failure_does_not_break(monkeypatch):
         assert data["reply_status"] == 500
         assert "fail" in (data["reply_detail"] or "")
 
+
+def test_line_webhook_invalid_signature_returns_401():
+    body = _payload()
+
+    raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    # Deliberately use a wrong signature
+    r = client.post(
+        "/api/v1/webhook/line/query",
+        data=raw,
+        headers={"Content-Type": "application/json", "X-Line-Signature": "invalidsig=="},
+    )
+    assert r.status_code == 401
+    data = r.json()
+    assert data["status"] == "unauthorized"
+    assert data["forwarded"] is False
+
+
+def test_line_webhook_missing_proxy_config_returns_500(monkeypatch):
+    body = _payload()
+
+    monkeypatch.setattr(settings, "LINE_PROXY_QUERY_ENDPOINT", None)
+    raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    sig = _sign(raw, settings.LINE_CHANNEL_SECRET)
+
+    r = client.post(
+        "/api/v1/webhook/line/query",
+        data=raw,
+        headers={"Content-Type": "application/json", "X-Line-Signature": sig},
+    )
+    assert r.status_code == 500
+    data = r.json()
+    assert data["forwarded"] is False
+    assert "LINE_PROXY_QUERY_ENDPOINT" in (data["detail"] or "")
+
+
+def test_line_webhook_no_text_event_returns_200_no_forward():
+    body = {"events": [{"type": "follow", "source": {"type": "user", "userId": "U123"}}]}
+
+    raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    sig = _sign(raw, settings.LINE_CHANNEL_SECRET)
+
+    r = client.post(
+        "/api/v1/webhook/line/query",
+        data=raw,
+        headers={"Content-Type": "application/json", "X-Line-Signature": sig},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["forwarded"] is False
+    assert data["status"] == "ok"
+
+
+def test_line_webhook_auth_error_returns_500(monkeypatch):
+    body = _payload()
+
+    raw = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    sig = _sign(raw, settings.LINE_CHANNEL_SECRET)
+
+    with patch(
+        "app.api.v1.endpoints.webhook.CloudRunAuthService.get_id_token",
+        side_effect=RuntimeError("no credentials"),
+    ):
+        r = client.post(
+            "/api/v1/webhook/line/query",
+            data=raw,
+            headers={"Content-Type": "application/json", "X-Line-Signature": sig},
+        )
+    assert r.status_code == 500
+    data = r.json()
+    assert data["status"] == "error"
+    assert data["forwarded"] is False
+    assert "auth error" in (data["detail"] or "")

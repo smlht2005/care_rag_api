@@ -22,15 +22,15 @@ from typing import Any, Dict, List, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# 以你現有專案為預設值；你也可以用參數覆寫
-DEFAULT_PROJECT = "gen-lang-client-0567547134"
+# 以環境變數為優先；腳本不保留真實 project ID，避免意外部署到錯誤專案
+DEFAULT_PROJECT = ""  # 請使用 --project 或 GCP_PROJECT 環境變數指定
 DEFAULT_REGION = "asia-east1"
 
 TARGET_SERVICE = "care-rag-api"
 PROXY_SERVICE = "care-rag-line-proxy"
 
-# 你指定的 runtime service account
-RUNTIME_SA = "441535054378-compute@developer.gserviceaccount.com"
+# Runtime service account；可由 --runtime-sa 或 RUNTIME_SA 環境變數覆寫
+RUNTIME_SA = os.environ.get("RUNTIME_SA", "")
 
 # 專案規範的容器端口
 CONTAINER_PORT = "8002"
@@ -191,6 +191,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Deploy care-rag-line-proxy from care-rag-api")
     parser.add_argument("--project", default=os.environ.get("GCP_PROJECT", DEFAULT_PROJECT))
     parser.add_argument("--region", default=os.environ.get("GCP_REGION", DEFAULT_REGION))
+    parser.add_argument("--runtime-sa", default=os.environ.get("RUNTIME_SA", RUNTIME_SA),
+                        help="Cloud Run runtime service account email (required)")
     parser.add_argument("--dry-run", action="store_true", help="只輸出將執行動作，不做修改")
     parser.add_argument(
         "--skip-secret-versions",
@@ -198,6 +200,11 @@ def main() -> None:
         help="不新增 LINE secret version（僅授權/部署）",
     )
     args = parser.parse_args()
+
+    if not args.project:
+        sys.exit("Missing GCP project: use --project or set GCP_PROJECT env var.")
+    if not args.runtime_sa:
+        sys.exit("Missing runtime service account: use --runtime-sa or set RUNTIME_SA env var.")
 
     dot = _load_dotenv_simple(ROOT / ".env")
 
@@ -249,7 +256,7 @@ def main() -> None:
     # 4) 對所有 secret env 做 IAM（包含 GOOGLE_API_KEY 等，確保容器可啟動）
     secret_ids = sorted({v.split(":", 1)[0] for v in secret_env.values() if v})
     for sid in secret_ids:
-        _grant_secret_accessor(args.project, sid, RUNTIME_SA, dry_run=args.dry_run)
+        _grant_secret_accessor(args.project, sid, args.runtime_sa, dry_run=args.dry_run)
 
     # 5) 對 LINE secrets 生成新版本（必要時）
     if not args.skip_secret_versions:
@@ -282,7 +289,7 @@ def main() -> None:
             "--image",
             image,
             "--service-account",
-            RUNTIME_SA,
+            args.runtime_sa,
             "--port",
             CONTAINER_PORT,
             "--allow-unauthenticated",
