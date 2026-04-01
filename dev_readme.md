@@ -2,6 +2,22 @@
 
 ## 更新歷史
 
+### 2026-04-01 15:05 - AI Assistant - 新增一鍵 robocopy 部署腳本（同步至 `\\172.31.6.123\\c$`）
+
+**更新摘要：**
+- 新增 `docs/deploy/cmd/deploy_to_172.31.6.123.bat`：提供「備份目的地 src + 同步 `app/`、`scripts/`」的可重跑腳本，並輸出 Server 端重啟與驗證指令。
+- （Windows `cmd` 時間戳參考）`2026/04/01 15:05:06.37`
+
+---
+
+### 2026-04-01 15:02 - AI Assistant - 新增 Windows Server robocopy 部署 SOP（同步原始碼到 `\\172.31.6.123\\c$`）
+
+**更新摘要：**
+- 新增 `docs/deploy/robocopy-to-win-server-sop.md`：整理以 `robocopy` 同步 `app/`、`scripts/`（選用 `docs/`）到 `\\172.31.6.123\c$\sites\app\care_rag_api\src` 的完整 SOP，包含備份、重啟（NSSM/Service）與驗證清單。
+- （Windows `cmd` 時間戳參考）`2026/04/01 15:02:09.14`
+
+---
+
 ### 2026-04-01 13:23 - AI Assistant - Cloud Run 部署 `care-rag-line-proxy`（與 `care-rag-api` 同映像）
 
 **更新摘要：**
