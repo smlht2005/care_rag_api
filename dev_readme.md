@@ -2,6 +2,28 @@
 
 ## 更新歷史
 
+### 2026-04-01 13:23 - AI Assistant - Cloud Run 部署 `care-rag-line-proxy`（與 `care-rag-api` 同映像）
+
+**更新摘要：**
+- 執行 `python scripts/deploy_care_rag_line_proxy.py --project gen-lang-client-0567547134 --runtime-sa 441535054378-compute@developer.gserviceaccount.com --skip-secret-versions`：自承接流量之 `care-rag-api` revision 取得映像 `asia-east1-docker.pkg.dev/.../care-rag-api@sha256:97d027cb...` 並部署至 `care-rag-line-proxy`。
+- 初次部署後發現環境自 API 複製時未含 `LINE_REPLY_ENABLED`，預設為 false 會停用 Reply；已 `gcloud run services update care-rag-line-proxy --update-env-vars LINE_REPLY_ENABLED=true`，新 revision `care-rag-line-proxy-00009-pct`，100% 流量。
+- 部署腳本已補上覆寫 `LINE_REPLY_ENABLED=true`，避免下次重複遺漏。
+- Service URL：`https://care-rag-line-proxy-441535054378.asia-east1.run.app`
+- （Windows `cmd` 時間戳參考）`2026/04/01 13:23:55.04`
+
+---
+
+### 2026-04-01 13:18 - AI Assistant - Cloud Run 重新部署 `care-rag-api`（合併 PR #8 後版本）
+
+**更新摘要：**
+- 本機 `main`（`d558779`，含 LINE webhook、Reply、S2S、Orchestrator `QA_MIN_SCORE` 與 review 修正：ID token 快取、webhook auth 例外處理、部署腳本參數化、測試擴充）。
+- 指令：`gcloud run deploy care-rag-api --source . --region asia-east1 --project gen-lang-client-0567547134 --no-allow-unauthenticated`
+- 新 revision：`care-rag-api-00011-dzr`，**100% 流量**已自動導向。
+- Service URL：`https://care-rag-api-441535054378.asia-east1.run.app`
+- （Windows `cmd` 時間戳參考）`2026/04/01 13:18:38.81`
+
+---
+
 ### 2026-04-01 11:31 - AI Assistant - 新增 LINE@／Cloud Run 疑難排解文件
 
 **更新摘要：**

@@ -3,6 +3,10 @@
 """
 部署 Cloud Run Service A：care-rag-line-proxy（LINE webhook → 既有 care-rag-api）
 
+更新時間：2026-04-01 13:25
+作者：AI Assistant
+修改摘要：覆寫 env 時強制 LINE_REPLY_ENABLED=true（Service A 需 Reply API；care-rag-api 映像預設為 false）
+
 更新時間：2026-03-31 09:25
 作者：AI Assistant
 修改摘要：提供可在 Windows 上重複執行的部署腳本；自動從 `care-rag-api` 讀取承接流量的 revision image、複製 env/secret，覆寫 LINE proxy 相關設定，並將 LINE Channel Secret / X-API-Key 以 Secret Manager 掛載到 Service A。
@@ -241,6 +245,7 @@ def main() -> None:
 
     # 2) 覆寫 LINE proxy env
     plain_env["LINE_WEBHOOK_REQUIRE_SIGNATURE"] = "true"
+    plain_env["LINE_REPLY_ENABLED"] = "true"
     plain_env["LINE_PROXY_QUERY_ENDPOINT"] = base_url.rstrip("/") + "/api/v1/query"
     plain_env["LINE_PROXY_TARGET_AUDIENCE"] = base_url.rstrip("/")
 
