@@ -1,5 +1,8 @@
 """
 GraphRAG 編排器
+更新時間：2026-04-01 10:24
+作者：AI Assistant
+修改摘要：在最終 sources 合併後統一以 QA_MIN_SCORE 過濾所有路徑（含 graph keyword / 圖增強），避免低分來源繞過門檻仍被送進 LLM 產出答案
 更新時間：2026-03-11
 作者：AI Assistant
 修改摘要：有圖時改為「只檢索不生成」+ 圖增強後一次 LLM，避免 RAG 先生成再圖增強又生成的重複呼叫
@@ -113,8 +116,12 @@ class GraphOrchestrator:
                 result["sources"] = all_sources[:top_k]  # 只返回 top_k
                 result["graph_enhanced"] = True
             
-            # 4.1 設定 answer：無來源則「未找到」；有圖時為 retrieve 路徑，只在此呼叫一次 LLM
+            # 4.1 統一以 QA_MIN_SCORE 過濾所有路徑的低分來源（含 graph keyword / 圖增強）
             final_sources = result.get("sources", [])
+            final_sources = [s for s in final_sources if s.get("score", 0.0) >= settings.QA_MIN_SCORE]
+            result["sources"] = final_sources
+
+            # 4.2 設定 answer：無來源則「未找到」；有圖時為 retrieve 路徑，只在此呼叫一次 LLM
             if not final_sources:
                 result["answer"] = NO_MATCH_MESSAGE
             elif self.graph_store:

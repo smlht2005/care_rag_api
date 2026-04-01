@@ -1,5 +1,8 @@
 """
 應用程式配置檔案
+更新時間：2026-03-31 11:53
+作者：AI Assistant
+修改摘要：新增 LINE Reply API 所需設定（LINE_CHANNEL_ACCESS_TOKEN 等），供 LINE webhook proxy 在取得答案後回覆到 LINE 聊天室
 更新時間：2026-03-11 00:00
 作者：AI Assistant
 修改摘要：新增 QA_MIN_SCORE（float，預設 0.60）控制 QA embedding 搜尋相似度門檻，低於此值的結果將被過濾，避免負向查詢誤報
@@ -101,6 +104,25 @@ class Settings(BaseSettings):
     GRAPH_CACHE_TTL: int = 3600  # 圖查詢快取 TTL（秒）
     # QA embedding 搜尋相似度門檻；低於此值視為無相關 QA，避免不相關查詢（如「火星探測車」）誤觸 QA 回答
     QA_MIN_SCORE: float = 0.60
+
+    # =============================================================================
+    # LINE Webhook Proxy（Service A）
+    # =============================================================================
+    LINE_CHANNEL_SECRET: Optional[str] = None
+    LINE_WEBHOOK_REQUIRE_SIGNATURE: bool = True
+    LINE_PROXY_QUERY_ENDPOINT: Optional[str] = None
+    LINE_PROXY_TARGET_AUDIENCE: Optional[str] = None
+    LINE_PROXY_INVOKER_SERVICE_ACCOUNT: Optional[str] = None
+    LINE_PROXY_X_API_KEY: Optional[str] = None
+    LINE_PROXY_TOP_K: int = 3
+    LINE_PROXY_TIMEOUT_SEC: float = 30.0
+
+    # LINE Reply API（把答案回覆到聊天室）
+    LINE_REPLY_ENABLED: bool = False
+    LINE_CHANNEL_ACCESS_TOKEN: Optional[str] = None
+
+    # 僅供本機測試腳本使用（不影響雲端商用邏輯）
+    LINE_WEBHOOK_TEST_BASE_URL: Optional[str] = None
     
     class Config:
         env_file = ".env"
