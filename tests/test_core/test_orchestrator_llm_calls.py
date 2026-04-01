@@ -57,7 +57,7 @@ async def test_without_graph_store_calls_query_once_not_retrieve_nor_generate():
     rag.query = AsyncMock(
         return_value={
             "answer": "only answer",
-            "sources": [{"id": "s1", "content": "c1"}],
+            "sources": [{"id": "s1", "content": "c1", "score": 0.85}],
             "query": "test query",
         }
     )

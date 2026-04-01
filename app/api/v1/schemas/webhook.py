@@ -1,11 +1,14 @@
 """
 Webhook API 結構定義
+更新時間：2026-03-31 11:53
+作者：AI Assistant
+修改摘要：新增 LINE webhook proxy 所需 schema（events/message/replyToken）與 proxy 回應格式
 更新時間：2025-12-26 12:08
 作者：AI Assistant
 修改摘要：創建 Webhook 相關的 Schema 定義
 """
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, Literal
+from typing import Optional, Dict, Any, Literal, List
 from datetime import datetime
 
 class WebhookEventRequest(BaseModel):
@@ -30,4 +33,33 @@ class WebhookStatusResponse(BaseModel):
     last_event_at: Optional[datetime] = None
     webhook_url: Optional[str] = None
 
+
+class LineWebhookMessage(BaseModel):
+    type: str
+    id: Optional[str] = None
+    text: Optional[str] = None
+
+
+class LineWebhookEvent(BaseModel):
+    type: str
+    replyToken: Optional[str] = None
+    message: Optional[LineWebhookMessage] = None
+    source: Optional[Dict[str, Any]] = None
+    timestamp: Optional[int] = None
+
+
+class LineWebhookRequest(BaseModel):
+    events: List[LineWebhookEvent] = Field(default_factory=list)
+
+
+class LineWebhookProxyResponse(BaseModel):
+    status: str
+    event_id: str
+    forwarded: bool = False
+    query_status: Optional[int] = None
+    query: Optional[str] = None
+    answer: Optional[str] = None
+    detail: Optional[str] = None
+    reply_status: Optional[int] = None
+    reply_detail: Optional[str] = None
 

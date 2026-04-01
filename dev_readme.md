@@ -2,6 +2,80 @@
 
 ## 更新歷史
 
+### 2026-04-01 11:31 - AI Assistant - 新增 LINE@／Cloud Run 疑難排解文件
+
+**更新摘要：**
+- 新增 `docs/lineAt/lineAt-line-settings-cloud-troubleshooting.md`：彙整 LINE Developers／Official Account 設定、雙 Cloud Run 服務、Secret／IAM、`gcloud` 常見錯誤、流量與 `QA_MIN_SCORE` 相關現象與檢查清單。
+- `docs/lineAt/lineAt-cloudrun-sop.md` 開頭補上與該文件的交叉連結。
+- （Windows `cmd` 時間戳參考）`2026/04/01 11:31:59.49`
+
+---
+
+### 2026-04-01 11:16 - AI Assistant - Orchestrator 統一 QA_MIN_SCORE 過濾（含 graph 路徑）
+
+**更新摘要：**
+- 修改 `app/core/orchestrator.py`：在最終 `final_sources` 合併後（步驟 4.1），統一以 `settings.QA_MIN_SCORE` 過濾所有路徑的低分來源，涵蓋 graph keyword fallback（固定 0.35）及圖增強動態分數。
+- 修正原因：先前 `QA_MIN_SCORE` 僅作用於 QA embedding 檢索路徑，graph keyword / 圖增強路徑的低分來源可繞過門檻被送進 LLM 產出答案。
+- 測試修補：`tests/test_core/test_orchestrator_llm_calls.py` mock source 補上 `score: 0.85`，全 30 筆 pytest 通過。
+- Cloud Run 部署：`gcloud run deploy --source .` → revision `care-rag-api-00010-h5c`，100% 流量已自動切至最新版。
+- Service URL：`https://care-rag-api-441535054378.asia-east1.run.app`
+- （Windows `cmd` 時間戳參考）`2026/04/01 11:16:32.99`
+
+---
+
+### 2026-03-31 14:16 - AI Assistant - LINE Reply：提升可觀測性並更新 `care-rag-line-proxy` 映像
+
+**更新摘要：**
+- 修正 `POST /api/v1/webhook/line/query`：新增 INFO log（`reply_token_present` / `answer_present` / `query_status`），避免「A→B 200 但聊天室無回覆」時無法判斷是 replyToken 缺失或 answer 為空。
+- 調整回覆觸發：只要上游 `care-rag-api /api/v1/query` 回 200，就會嘗試呼叫 LINE Reply API（answer 空時使用 fallback 文案），讓實測更可觀測。
+- 以 Cloud Build 建置並推送新 image：`asia-east1-docker.pkg.dev/gen-lang-client-0567547134/care-rag/care-rag-line-proxy:reply-20260331-1413`（digest `sha256:8304e090382cae5c143d33006df41da92b6160754f27b5ad3371585c681909d2`）。
+- Cloud Run 已更新 `care-rag-line-proxy` 至 revision `care-rag-line-proxy-00004-zb6`，並承接 100% 流量（不變更 `care-rag-api`）。
+- （Windows `cmd` 時間戳參考）`2026/03/31 14:16:42.30`
+
+---
+
+### 2026-03-31 14:35 - AI Assistant - 修正 Secret token 末尾換行導致 Reply header 非法
+
+**更新摘要：**
+- 修正 LINE Reply：`LINE_CHANNEL_ACCESS_TOKEN` 由 Secret Manager 注入時可能含換行（`\\r\\n`），造成 `Authorization` header 非法；已在 `_line_reply()` 內對 token `.strip()` 後再使用。
+- Cloud Build 新 image：`asia-east1-docker.pkg.dev/gen-lang-client-0567547134/care-rag/care-rag-line-proxy:reply-20260331-1432`（digest `sha256:4d04a01ef5cd3ae2b83ecdbb7e807c91d0979dc05e7751c34b1a88eb27862601`）。
+- Cloud Run 已更新至 revision `care-rag-line-proxy-00007-lmd`，承接 100% 流量。
+- 以本機簽章測試驗證：Webhook → A（200）→ B（200）成功；Reply API 會回 `400 Invalid reply token`（因測試用 dummy replyToken，屬預期）。
+- （Windows `cmd` 時間戳參考）`2026/03/31 14:35:39.95`
+
+---
+
+### 2026-03-31 09:25 - AI Assistant - 新增 care-rag-line-proxy 部署脚本（可重跑）
+
+**更新摘要：**
+- 新增 `scripts/deploy_care_rag_line_proxy.py`：自動從 `care-rag-api` 取得承接流量 revision 的 image、複製 env/secret，覆寫 `LINE_*` proxy 相關設定，並將 `LINE_CHANNEL_SECRET` / `LINE_PROXY_X_API_KEY` 以 Secret Manager 掛載到 `care-rag-line-proxy`。
+- 腳本會把 env-vars-file 內所有值強制轉成字串（避免 YAML 將 `true/false` 當成 bool 造成 `gcloud run deploy` 失敗）。
+- repo 中不會寫入任何明文金鑰；金鑰僅從本機 `.env`/環境變數讀取後立即寫入 Secret Manager。
+
+---
+
+### 2026-03-31 09:17 - AI Assistant - Cloud Run Service A：`care-rag-line-proxy` 已部署（LINE → care-rag-api）
+
+**更新摘要：**
+- 使用者完成 `gcloud` 重新登入後，已依計畫 `c:\Users\hungtao.liu\.cursor\plans\linea-servicea_9b68a2d4.plan.md` 部署新服務 **`care-rag-line-proxy`**（`asia-east1`）。
+- 映像與 **承接流量之** `care-rag-api` revision（`care-rag-api-00005-zqs`）一致：`sha256:f87537302b9170323fc3d7fe66580a6273083f3065abe7a5b868a6293d5db8cd`；`LINE_PROXY_QUERY_ENDPOINT` / `LINE_PROXY_TARGET_AUDIENCE` 指向現有 `care-rag-api` URL。
+- Secret Manager：`LINE_CHANNEL_SECRET`、`LINE_PROXY_X_API_KEY` 已建立並以 `--update-secrets` 掛載；執行身分 `441535054378-compute@developer.gserviceaccount.com` 具 `secretAccessor`（含沿用之 `GOOGLE_API_KEY` secret）。
+- **Service A URL**：`https://care-rag-line-proxy-441535054378.asia-east1.run.app` — LINE Webhook 請設：`https://care-rag-line-proxy-441535054378.asia-east1.run.app/api/v1/webhook/line/query`
+- 快速驗證：`GET /api/v1/health/` 200；未帶簽章之 `POST /api/v1/webhook/line/query` 回 401 `Invalid LINE signature`（預期）。
+- 部署過程注意：`--env-vars-file` 須將各 env 寫成**字串**（例如 JSON `true` 需改為 `"true"`），否則 `gcloud run deploy` 報錯。
+- （Windows `cmd` 時間戳參考）`2026/03/31  9:17:22.55`
+
+---
+
+### 2026-03-31 09:11 - AI Assistant - Service A（care-rag-line-proxy）部署尚未完成：gcloud 需重新登入
+
+**更新摘要：**
+- 依計畫 `c:\Users\hungtao.liu\.cursor\plans\linea-servicea_9b68a2d4.plan.md`（lineA-serviceA）欲部署 `care-rag-line-proxy`（LINE webhook → `care-rag-api`）；執行 `gcloud run services describe care-rag-api` 時回報 **Reauthentication failed**，非互動環境無法完成 `gcloud auth login`。
+- **請在本機 PowerShell 執行** `gcloud auth login` 成功後，再執行計畫中的 Secret / `gcloud run deploy care-rag-line-proxy` 步驟；完成後可將 LINE Webhook 設為 `https://<ServiceA_URL>/api/v1/webhook/line/query`。
+- （Windows `cmd` 時間戳參考）`2026/03/31  9:11:38.08`
+
+---
+
 ### 2026-03-27 15:36 - AI Assistant - 修正 WIF workflow 的 Python ID token 取得流程
 
 **更新摘要：**
