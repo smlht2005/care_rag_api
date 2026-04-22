@@ -1,5 +1,8 @@
 """
 向量檢索服務
+更新時間：2026-04-22 15:16
+作者：AI Assistant
+修改摘要：新增 QA embedding 命中追蹤 log：輸出 query / QA_MIN_SCORE / top hits（entity_id、score、code、question），協助定位「非 IC 查詢卻命中 IC 錯誤 QA」等誤匹配來源
 更新時間：2026-03-20 12:10
 作者：AI Assistant
 修改摘要：_search_from_graph 改呼叫 search_entities(..., include_type_match=False) 僅比對實體 name，避免 Organization 等 token 命中 type 假陽性；graph 來源 score 改為較低常數並於 metadata 標示 score_source=graph_keyword（見 docs/bug/missfind.md）
@@ -227,6 +230,8 @@ class VectorService:
         if not self.graph_store:
             return []
 
+        has_ic_context = bool(query and _IC_CONTEXT_RE.search(query))
+        ic_code, ic_code_type = _extract_ic_code(query or "")
         results: List[Dict[str, Any]] = []
         for entity_id, score, meta in hits:
             try:
@@ -252,6 +257,62 @@ class VectorService:
                     "metadata": {"source": "qa_embedding", "type": e.type, "properties": props, **meta},
                 }
             )
+
+        # 方案 C：必須「IC 上下文 + 明確代碼」才允許 IC error/field QA（避免非 IC 查詢誤命中 IC QA）
+        if results and not ic_code:
+            before = len(results)
+            results = [
+                r
+                for r in results
+                if not (
+                    str(r.get("id") or "").startswith("doc_thisqa_ic_error_qa_")
+                    or str(r.get("id") or "").startswith("doc_thisqa_ic_field_")
+                )
+            ]
+            filtered = before - len(results)
+            if filtered > 0:
+                self.logger.warning(
+                    "QA embedding IC-guard filtered=%s query=%r (has_ic_context=%s, ic_code=%r, ic_code_type=%r)",
+                    filtered,
+                    (query or "")[:200],
+                    has_ic_context,
+                    ic_code,
+                    ic_code_type,
+                )
+
+        if results:
+            # Debug / observability：輸出 top hits，便於定位為何命中某筆 QA（尤其是非 IC 查詢卻命中 IC 錯誤 QA）
+            preview = []
+            for r in results[: min(5, len(results))]:
+                p = (r.get("metadata") or {}).get("properties") or {}
+                preview.append(
+                    {
+                        "id": r.get("id"),
+                        "score": r.get("score"),
+                        "code": p.get("code"),
+                        "question": (str(p.get("question") or "")[:80] if p else "") or None,
+                    }
+                )
+            self.logger.info(
+                "QA embedding hits: query=%r qa_min_score=%s has_ic_context=%s top=%s",
+                (query or "")[:200],
+                settings.QA_MIN_SCORE,
+                has_ic_context,
+                preview,
+            )
+            # 非 IC 查詢卻命中 IC error QA：這通常代表 embedding 被「簽章/上傳/錯誤」語意吸引，需人工判斷是否該加守衛/別名/資料補強
+            if not has_ic_context:
+                top_id = str(results[0].get("id") or "")
+                if top_id.startswith(f"{IC_ERROR_QA_ID_PREFIX}") or top_id.startswith("doc_thisqa_ic_error_qa_"):
+                    top_props = ((results[0].get("metadata") or {}).get("properties") or {})
+                    self.logger.warning(
+                        "Non-IC query matched IC error QA: query=%r top_id=%s top_code=%s top_question=%r score=%s",
+                        (query or "")[:200],
+                        top_id,
+                        top_props.get("code"),
+                        str(top_props.get("question") or "")[:120],
+                        results[0].get("score"),
+                    )
         return results
 
     async def _search_from_graph(self, query: str, top_k: int) -> List[Dict]:

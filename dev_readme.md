@@ -2,6 +2,17 @@
 
 ## 更新歷史
 
+### 2026-04-22 15:56 - AI Assistant - 修正非 IC 查詢誤命中 IC error QA（方案 C 守衛）
+
+**更新摘要：**
+- 問題：非 IC 查詢（例如「回傳簽章」類）在 QA embedding 路徑誤命中 `doc_thisqa_ic_error_qa_16`，導致回覆被帶到 IC 錯誤碼答案。
+- 修正：於 `VectorService._search_from_qa_embeddings()` 加入守衛：**必須同時具備「IC 上下文 + 明確代碼」**才允許 `doc_thisqa_ic_error_qa_*` / `doc_thisqa_ic_field_*` 類結果；否則從 embedding hits 中過濾。
+- 可觀測性：保留並補強 log（`QA embedding hits`、`QA embedding IC-guard filtered=...`）以便追查命中來源。
+- 測試：新增 `tests/test_services/test_vector_service_ic_guard.py`（non-IC query 會過濾；IC+代碼仍可命中）。
+- （Windows `cmd` 時間戳參考）`2026/04/22 15:56:58.73`
+
+---
+
 ### 2026-04-01 15:05 - AI Assistant - 新增一鍵 robocopy 部署腳本（同步至 `\\172.31.6.123\\c$`）
 
 **更新摘要：**
