@@ -2,6 +2,18 @@
 
 ## 更新歷史
 
+### 2026-04-23 16:55 - AI Assistant - IC 代碼抽取補強：支援「IC卡錯誤01」與 AA/AB/AC/AD 裸碼
+
+**更新摘要：**
+- 問題 1：`IC卡錯誤01` 這種「中文+代碼黏在一起」的寫法，Python regex 的 `\\b` 無法切出 `01`（因中文也屬 `\\w`），導致 `_extract_ic_code()` 抽不到代碼 → 被「必須 IC+代碼」守衛擋掉而回 `未找到`。
+- 修正 1：裸碼抽取改用「英數邊界」lookaround（非 `\\b`），可正確抽出黏在中文旁邊的 `01/D039/AD61` 等代碼。
+- 問題 2：資料表含群組碼 `[AA] [AB] [AC] [AD]`，但 `IC卡 AA` / `IC卡AA` 無括號時抽不到代碼。
+- 修正 2：裸碼抽取新增支援 **AA/AB/AC/AD 群組碼**（避免允許任意兩碼字母造成把 `IC` 當代碼的誤判）。
+- 測試：擴充 `tests/test_services/test_vector_service_ic_guard.py` 覆蓋 `IC卡錯誤01` 與 `IC卡 AA/IC卡AA/IC卡錯誤AA`。
+- （Windows `cmd` 時間戳參考）`2026/04/23 16:55:14.64`
+
+---
+
 ### 2026-04-23 16:16 - AI Assistant - 新增 IC alias mapping（IC錯誤01 → IC卡 [01]）
 
 **更新摘要：**

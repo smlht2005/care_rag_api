@@ -1,5 +1,8 @@
 """
 向量檢索服務
+更新時間：2026-04-23 16:32
+作者：AI Assistant
+修改摘要：修正 IC alias 正規化：即使已含 IC卡 上下文，若代碼因黏在中文後方無法抽取（如「IC卡錯誤01」），仍會改寫成標準「IC卡 [01]」避免被守衛誤擋
 更新時間：2026-04-23 16:15
 作者：AI Assistant
 修改摘要：新增 IC alias 正規化：將「IC錯誤01 / IC卡錯誤01 / IC 01」改寫為標準「IC卡 [01]」，讓既有 IC QA 守衛可正確放行並命中對應 QA
@@ -44,7 +47,18 @@ IC_ERROR_QA_ID_PREFIX = settings.GRAPH_IC_ERROR_QA_ENTITY_ID_PREFIX
 _IC_CONTEXT_RE = re.compile(r"IC\s*卡|IC卡", re.IGNORECASE)
 _CODE_BRACKET_RE = re.compile(r"\[\s*([A-Za-z0-9]+)\s*\]")
 _CODE_ANGLE_RE = re.compile(r"<\s*([A-Za-z0-9]+)\s*>")
-_CODE_BARE_RE = re.compile(r"\b([A-Za-z]{1,2}\d{2,4}|\d{2,4})\b")
+# 注意：Python regex 的 \b 以「\w vs \W」定義字界線，而 \w 會包含中文（Unicode letters）。
+# 因此像「IC卡錯誤01」中，'誤' 與 '0' 都屬於 \w，\b 無法切出 '01'。
+# 這裡改用「僅針對英數」的邊界（避免黏在中文旁邊時抓不到代碼）。
+# 允許：
+# - 純數字（01/16）
+# - 字母+數字（AA01/AD61/D039/E012）
+# - 群組碼（AA/AB/AC/AD），對應 IC卡資料上傳錯誤對照表中的群組碼
+# 重要：不要允許任意兩碼純字母，否則會誤把「IC卡AA」中的「IC」當成代碼。
+_CODE_BARE_RE = re.compile(
+    r"(?<![A-Za-z0-9])((?:AA|AB|AC|AD)|[A-Za-z]{1,2}\d{2,4}|\d{2,4})(?![A-Za-z0-9])",
+    re.IGNORECASE,
+)
 _FIELD_CODE_RE = re.compile(r"^[MDHVE]\d{2}$", re.IGNORECASE)
 _IC_ALIAS_CONTEXT_RE = re.compile(r"(IC\s*錯誤|IC錯誤|IC\s*error|ICerror|\bIC\b)", re.IGNORECASE)
 _IC_ALIAS_CODE_RE = re.compile(r"([A-Za-z]{1,2}\d{2,4}|\d{1,4})", re.IGNORECASE)
@@ -90,9 +104,13 @@ def _normalize_ic_alias_query(query: str) -> tuple[str, Optional[str]]:
     raw = (query or "").strip()
     if not raw:
         return raw, None
-    # 若已含標準 IC 卡上下文，交給既有 _extract_ic_code()，不重複改寫
+    # 若已含標準 IC 卡上下文：
+    # - 若已能抽出代碼，交給既有流程，不重複改寫
+    # - 若抽不出代碼（例如「IC卡錯誤01」代碼黏在中文後方），仍嘗試 alias 正規化補救
     if _IC_CONTEXT_RE.search(raw):
-        return raw, None
+        code, _ = _extract_ic_code(raw)
+        if code:
+            return raw, None
     # 只在「明顯是 IC 類」時才嘗試（避免誤改寫）
     if not _IC_ALIAS_CONTEXT_RE.search(raw):
         return raw, None

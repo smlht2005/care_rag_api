@@ -2,9 +2,9 @@
 VectorService IC QA guard 測試：
 當 query 不具備「IC 上下文 + 明確代碼」時，應避免 QA embedding 命中 IC error/field QA 造成誤匹配。
 
-更新時間：2026-04-23 16:15
+更新時間：2026-04-23 16:45
 作者：AI Assistant
-修改摘要：新增 IC QA guard 測試並涵蓋 alias 正規化（IC錯誤01 / IC 01 改寫為 IC卡 [01]）
+修改摘要：擴充 IC code 裸碼規則支援 AA/AB/AC/AD 群組碼，並補測試覆蓋
 """
 
 import pytest
@@ -36,6 +36,13 @@ class _FakeGraphStore:
                 "IC 卡資料上傳錯誤代碼 [01] 代表什麼？",
                 "資料型態檢核錯誤",
                 "01",
+            )
+        if entity_id == "doc_thisqa_ic_error_qa_AA":
+            return _FakeEntity(
+                entity_id,
+                "IC 卡資料上傳錯誤代碼 [AA] 代表什麼？",
+                "欄位資料必填寫",
+                "AA",
             )
         return None
 
@@ -101,4 +108,24 @@ async def test_ic_alias_mapping_allows_ic_error_code_query(monkeypatch):
 
     r2 = await svc.search("IC 01", top_k=3)
     assert r2 and r2[0]["id"] == "doc_thisqa_ic_error_qa_01"
+
+    # 既有 IC卡 上下文但代碼黏在中文後方：仍應被 alias 正規化補救
+    r3 = await svc.search("IC卡錯誤01", top_k=3)
+    assert r3 and r3[0]["id"] == "doc_thisqa_ic_error_qa_01"
+
+
+@pytest.mark.asyncio
+async def test_ic_bare_code_supports_letter_group_code_AA(monkeypatch):
+    """
+    支援 IC error 群組碼裸碼：IC卡 AA / IC卡AA / IC卡錯誤AA 應能抽出 AA 並命中 doc_thisqa_ic_error_qa_AA。
+    """
+    svc = VectorService(graph_store=_FakeGraphStore())
+    monkeypatch.setattr(svc, "_embedding", _FakeEmbedding())
+    # 不依賴 embedding 命中，確保走 ic_special_qa（graph entity by code）
+    monkeypatch.setattr(svc._qa_index, "search", lambda query_emb, top_k, min_score: [])
+
+    for q in ("IC卡 AA", "IC卡AA", "IC卡錯誤AA"):
+        r = await svc.search(q, top_k=3)
+        assert r and r[0]["id"] == "doc_thisqa_ic_error_qa_AA"
+        assert "欄位資料必填寫" in (r[0].get("content") or "")
 
