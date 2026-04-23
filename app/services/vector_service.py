@@ -1,5 +1,8 @@
 """
 向量檢索服務
+更新時間：2026-04-23 16:15
+作者：AI Assistant
+修改摘要：新增 IC alias 正規化：將「IC錯誤01 / IC卡錯誤01 / IC 01」改寫為標準「IC卡 [01]」，讓既有 IC QA 守衛可正確放行並命中對應 QA
 更新時間：2026-04-22 15:16
 作者：AI Assistant
 修改摘要：新增 QA embedding 命中追蹤 log：輸出 query / QA_MIN_SCORE / top hits（entity_id、score、code、question），協助定位「非 IC 查詢卻命中 IC 錯誤 QA」等誤匹配來源
@@ -43,6 +46,8 @@ _CODE_BRACKET_RE = re.compile(r"\[\s*([A-Za-z0-9]+)\s*\]")
 _CODE_ANGLE_RE = re.compile(r"<\s*([A-Za-z0-9]+)\s*>")
 _CODE_BARE_RE = re.compile(r"\b([A-Za-z]{1,2}\d{2,4}|\d{2,4})\b")
 _FIELD_CODE_RE = re.compile(r"^[MDHVE]\d{2}$", re.IGNORECASE)
+_IC_ALIAS_CONTEXT_RE = re.compile(r"(IC\s*錯誤|IC錯誤|IC\s*error|ICerror|\bIC\b)", re.IGNORECASE)
+_IC_ALIAS_CODE_RE = re.compile(r"([A-Za-z]{1,2}\d{2,4}|\d{1,4})", re.IGNORECASE)
 
 
 def _extract_ic_code(query: str) -> tuple:
@@ -69,6 +74,36 @@ def _extract_ic_code(query: str) -> tuple:
         return None, ""
     code_type = "field" if _FIELD_CODE_RE.match(code) else "error"
     return code, code_type
+
+
+def _normalize_ic_alias_query(query: str) -> tuple[str, Optional[str]]:
+    """
+    IC alias 正規化（方案 3-B）：將常見輸入改寫為標準格式，避免守衛誤擋。
+
+    例：
+    - IC錯誤01 / IC卡錯誤01 / IC 01  -> IC卡 [01]
+    - IC錯誤D039                    -> IC卡 [D039]
+
+    僅在「看起來是 IC 類 query 且能抽出代碼」時改寫；否則保持原樣。
+    回傳 (normalized_query, reason)。reason=None 表示未改寫。
+    """
+    raw = (query or "").strip()
+    if not raw:
+        return raw, None
+    # 若已含標準 IC 卡上下文，交給既有 _extract_ic_code()，不重複改寫
+    if _IC_CONTEXT_RE.search(raw):
+        return raw, None
+    # 只在「明顯是 IC 類」時才嘗試（避免誤改寫）
+    if not _IC_ALIAS_CONTEXT_RE.search(raw):
+        return raw, None
+    # 必須能抽出代碼才改寫（避免把「IC卡錯誤」但無代碼的句子改壞）
+    m = _CODE_BRACKET_RE.search(raw) or _CODE_ANGLE_RE.search(raw) or _IC_ALIAS_CODE_RE.search(raw)
+    if not m:
+        return raw, None
+    code = re.sub(r"\s+", "", m.group(1)).upper()
+    if not code:
+        return raw, None
+    return f"IC卡 [{code}]", f"ic_alias:{code}"
 
 
 class VectorService:
@@ -147,6 +182,11 @@ class VectorService:
 
     async def search(self, query: str, top_k: int = 3) -> List[Dict]:
         """檢索：若查詢含 IC 錯誤代碼或欄位代碼則優先帶回對應 QA1；其餘依 QA embedding / graph keyword / stub。"""
+        normalized, reason = _normalize_ic_alias_query(query)
+        if reason:
+            self.logger.info("Normalized IC alias query: raw=%r normalized=%r reason=%s", (query or "")[:200], normalized, reason)
+        query = normalized
+
         ic_error_source: Optional[Dict[str, Any]] = None
         ic_field_source: Optional[Dict[str, Any]] = None
         if query and self.graph_store:

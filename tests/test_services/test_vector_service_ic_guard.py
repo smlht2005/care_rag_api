@@ -2,9 +2,9 @@
 VectorService IC QA guard 測試：
 當 query 不具備「IC 上下文 + 明確代碼」時，應避免 QA embedding 命中 IC error/field QA 造成誤匹配。
 
-更新時間：2026-04-22 15:16
+更新時間：2026-04-23 16:15
 作者：AI Assistant
-修改摘要：新增 IC QA guard 測試（non-IC query 會過濾 IC QA；IC+代碼 query 仍可命中）
+修改摘要：新增 IC QA guard 測試並涵蓋 alias 正規化（IC錯誤01 / IC 01 改寫為 IC卡 [01]）
 """
 
 import pytest
@@ -13,11 +13,11 @@ from app.services.vector_service import VectorService
 
 
 class _FakeEntity:
-    def __init__(self, entity_id: str, question: str, answer: str, *, entity_type: str = "QA1"):
+    def __init__(self, entity_id: str, question: str, answer: str, code: str, *, entity_type: str = "QA1"):
         self.id = entity_id
         self.type = entity_type
         self.name = entity_id
-        self.properties = {"question": question, "answer": answer, "code": "16"}
+        self.properties = {"question": question, "answer": answer, "code": code}
 
 
 class _FakeGraphStore:
@@ -28,6 +28,14 @@ class _FakeGraphStore:
                 entity_id,
                 "IC 卡資料上傳錯誤代碼 [16] 代表什麼？",
                 "處方簽章驗證不通過",
+                "16",
+            )
+        if entity_id == "doc_thisqa_ic_error_qa_01":
+            return _FakeEntity(
+                entity_id,
+                "IC 卡資料上傳錯誤代碼 [01] 代表什麼？",
+                "資料型態檢核錯誤",
+                "01",
             )
         return None
 
@@ -72,4 +80,25 @@ async def test_ic_query_with_code_allows_ic_error_qa_embedding_hit(monkeypatch):
     assert len(results) == 1
     assert results[0]["id"] == "doc_thisqa_ic_error_qa_16"
     assert "處方簽章驗證不通過" in (results[0].get("content") or "")
+
+
+@pytest.mark.asyncio
+async def test_ic_alias_mapping_allows_ic_error_code_query(monkeypatch):
+    """
+    alias 正規化：IC錯誤01 / IC 01 應改寫為 IC卡 [01]，讓守衛放行並命中 doc_thisqa_ic_error_qa_01。
+    """
+    svc = VectorService(graph_store=_FakeGraphStore())
+    monkeypatch.setattr(svc, "_embedding", _FakeEmbedding())
+    monkeypatch.setattr(
+        svc._qa_index,
+        "search",
+        lambda query_emb, top_k, min_score: [("doc_thisqa_ic_error_qa_01", 0.80, {})],
+    )
+
+    r1 = await svc.search("IC錯誤01", top_k=3)
+    assert r1 and r1[0]["id"] == "doc_thisqa_ic_error_qa_01"
+    assert "資料型態檢核錯誤" in (r1[0].get("content") or "")
+
+    r2 = await svc.search("IC 01", top_k=3)
+    assert r2 and r2[0]["id"] == "doc_thisqa_ic_error_qa_01"
 

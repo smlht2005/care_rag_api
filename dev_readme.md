@@ -2,6 +2,16 @@
 
 ## 更新歷史
 
+### 2026-04-23 16:16 - AI Assistant - 新增 IC alias mapping（IC錯誤01 → IC卡 [01]）
+
+**更新摘要：**
+- 問題：使用者常見輸入如 `IC錯誤01` / `IC卡錯誤01` / `IC 01` 會因代碼與文字黏在一起，無法被既有 IC 代碼抽取器辨識，進而被「方案 C（必須 IC+代碼）」守衛擋掉而回 `未找到`。
+- 修正：於 `VectorService.search()` 最前面加入 **alias 正規化**（只在能抽出代碼時改寫），把上述輸入改寫成標準 `IC卡 [01]`，讓既有 IC QA 流程可正確命中對應 `doc_thisqa_ic_error_qa_{CODE}`。
+- 測試：擴充 `tests/test_services/test_vector_service_ic_guard.py`，新增 `IC錯誤01` / `IC 01` 會命中 `[01]` 的案例。
+- （Windows `cmd` 時間戳參考）`2026/04/23 16:16:51.25`
+
+---
+
 ### 2026-04-22 15:56 - AI Assistant - 修正非 IC 查詢誤命中 IC error QA（方案 C 守衛）
 
 **更新摘要：**
