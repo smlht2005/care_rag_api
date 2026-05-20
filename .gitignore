@@ -14,5 +14,19 @@ out/
 
 # misc
 .DS_Store
+.DS_Store.*
+Thumbs.db
 *.pem
+*.key
 *.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# build output
+dist/
+coverage/
+*.tsbuildinfo

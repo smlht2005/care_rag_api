@@ -15,5 +15,5 @@ export async function GET(req: NextRequest) {
     session.codeVerifier = undefined; session.state = undefined
     await session.save()
     return NextResponse.redirect(new URL('/dashboard', req.url))
-  } catch (err) { console.error('[callback]', err); await session.destroy(); return NextResponse.redirect(new URL('/login', req.url)) }
+  } catch (err) { console.error('[callback] token exchange error:', err instanceof Error ? err.message : 'unknown'); await session.destroy(); return NextResponse.redirect(new URL('/login', req.url)) }
 }

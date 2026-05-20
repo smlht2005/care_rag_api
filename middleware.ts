@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-const PUBLIC_PREFIXES = ['/login', '/unauthorized', '/api/auth', '/_next', '/favicon.ico']
+const PUBLIC_PATHS  = new Set(['/login', '/unauthorized', '/favicon.ico'])
+const PUBLIC_PREFIX = ['/api/auth/', '/_next/']
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
-  if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) return NextResponse.next()
+  if (PUBLIC_PATHS.has(pathname) || PUBLIC_PREFIX.some(p => pathname.startsWith(p))) return NextResponse.next()
   if (!req.cookies.has('hospital_session')) return NextResponse.redirect(new URL('/api/auth/login', req.url))
   return NextResponse.next()
 }

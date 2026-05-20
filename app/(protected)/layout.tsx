@@ -1,7 +1,5 @@
-import { redirect } from 'next/navigation'
-import { getSession } from '@/lib/session'
+import { requireAuth } from '@/lib/auth-guard'
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
-  const session = await getSession()
-  if (!session.accessToken) redirect('/login')
+  await requireAuth()
   return <>{children}</>
 }

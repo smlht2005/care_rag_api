@@ -1,5 +1,5 @@
 import { createRemoteJWKSet, jwtVerify, JWTPayload } from 'jose'
-import { keycloakUrls } from './keycloak-config'
+import { keycloakConfig, keycloakUrls } from './keycloak-config'
 const JWKS = createRemoteJWKSet(new URL(keycloakUrls.jwksUri))
 export interface KeycloakJWTPayload extends JWTPayload {
   realm_access?: { roles: string[] }
@@ -8,6 +8,9 @@ export interface KeycloakJWTPayload extends JWTPayload {
   name?: string
 }
 export async function verifyAccessToken(token: string): Promise<KeycloakJWTPayload> {
-  const { payload } = await jwtVerify(token, JWKS, { issuer: keycloakUrls.issuer })
+  const { payload } = await jwtVerify(token, JWKS, {
+    issuer:   keycloakUrls.issuer,
+    audience: keycloakConfig.clientId,
+  })
   return payload as KeycloakJWTPayload
 }

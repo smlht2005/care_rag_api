@@ -1,9 +1,15 @@
+function requireEnv(name: string): string {
+  const val = process.env[name]
+  if (!val) throw new Error(`Missing required environment variable: ${name}`)
+  return val
+}
+
 export const keycloakConfig = {
-  url:          process.env.KEYCLOAK_URL!,
-  realm:        process.env.KEYCLOAK_REALM!,
-  clientId:     process.env.KEYCLOAK_CLIENT_ID!,
-  clientSecret: process.env.KEYCLOAK_CLIENT_SECRET!,
-  redirectUri:  `${process.env.NEXTJS_URL}/api/auth/callback`,
+  url:          requireEnv('KEYCLOAK_URL'),
+  realm:        requireEnv('KEYCLOAK_REALM'),
+  clientId:     requireEnv('KEYCLOAK_CLIENT_ID'),
+  clientSecret: requireEnv('KEYCLOAK_CLIENT_SECRET'),
+  redirectUri:  `${requireEnv('NEXTJS_URL')}/api/auth/callback`,
 }
 const base = `${keycloakConfig.url}/realms/${keycloakConfig.realm}/protocol/openid-connect`
 export const keycloakUrls = {

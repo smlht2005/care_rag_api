@@ -30,7 +30,7 @@ spec:
     spec:
       containers:
         - name: nextjs
-          image: hospital/nextjs-rbac:latest
+          image: hospital/nextjs-rbac:v1.0.0
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
@@ -57,13 +57,35 @@ spec:
                 secretKeyRef:
                   name: nextjs-rbac-secrets
                   key: session-secret
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
-              cpu: "100m"
-              memory: "256Mi"
-            limits:
-              cpu: "500m"
+              cpu: "250m"
               memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
 ---
 apiVersion: v1
 kind: Service
@@ -101,3 +123,40 @@ spec:
                 name: nextjs-rbac
                 port:
                   number: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nextjs-rbac-hpa
+  namespace: hospital
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nextjs-rbac
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nextjs-rbac-pdb
+  namespace: hospital
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: nextjs-rbac

@@ -10,10 +10,9 @@
     "directAccessGrantsEnabled": false,
     "pkceCodeChallengeMethod": "S256",
     "redirectUris": [
-      "https://his.hospital.internal/api/auth/callback",
-      "http://localhost:3000/api/auth/callback"
+      "https://his.hospital.internal/api/auth/callback"
     ],
-    "webOrigins": ["https://his.hospital.internal", "http://localhost:3000"],
+    "webOrigins": ["https://his.hospital.internal"],
     "secret": "${KEYCLOAK_CLIENT_SECRET}"
   }],
   "roles": {
