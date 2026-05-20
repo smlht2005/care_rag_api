@@ -1,0 +1,77 @@
+{
+  "realm": "hospital",
+  "enabled": true,
+  "sslRequired": "none",
+  "clients": [{
+    "clientId": "nextjs-bff",
+    "enabled": true,
+    "publicClient": false,
+    "standardFlowEnabled": true,
+    "directAccessGrantsEnabled": false,
+    "pkceCodeChallengeMethod": "S256",
+    "redirectUris": [
+      "https://*.app.github.dev/api/auth/callback",
+      "http://localhost:3000/api/auth/callback"
+    ],
+    "webOrigins": ["+"],
+    "secret": "dev-secret-not-for-production"
+  }],
+  "roles": {
+    "realm": [
+      { "name": "admin",  "description": "Full system access" },
+      { "name": "doctor", "description": "Clinical read/write" },
+      { "name": "nurse",  "description": "Patient read + vitals write" },
+      { "name": "viewer", "description": "Read-only access" }
+    ]
+  },
+  "users": [
+    {
+      "username": "admin-user",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "Admin1234!", "temporary": false }],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "doctor-user",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "Doctor1234!", "temporary": false }],
+      "realmRoles": ["doctor"]
+    },
+    {
+      "username": "nurse-user",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "Nurse1234!", "temporary": false }],
+      "realmRoles": ["nurse"]
+    },
+    {
+      "username": "viewer-user",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "Viewer1234!", "temporary": false }],
+      "realmRoles": ["viewer"]
+    }
+  ],
+  "groups": [
+    { "name": "admin-group",  "realmRoles": ["admin"]  },
+    { "name": "doctor-group", "realmRoles": ["doctor"] },
+    { "name": "nurse-group",  "realmRoles": ["nurse"]  },
+    { "name": "viewer-group", "realmRoles": ["viewer"] }
+  ],
+  "clientScopes": [{
+    "name": "roles",
+    "protocol": "openid-connect",
+    "protocolMappers": [{
+      "name": "realm-roles-mapper",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-realm-role-mapper",
+      "config": {
+        "claim.name": "realm_access.roles",
+        "jsonType.label": "String",
+        "multivalued": "true",
+        "access.token.claim": "true",
+        "id.token.claim": "true",
+        "userinfo.token.claim": "true"
+      }
+    }]
+  }],
+  "defaultDefaultClientScopes": ["profile", "email", "roles"]
+}

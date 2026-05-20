@@ -2,10 +2,13 @@
 
 > **技術棧：** Next.js 14 App Router · iron-session · jose · Keycloak 24 · Docker / Kubernetes（地端部署）
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/smlht2005/nextjs-keycloak-rbac)
+
 ---
 
 ## 目錄
 
+- [GitHub Codespaces 快速啟動](#github-codespaces-快速啟動)
 - [系統架構](#系統架構)
 - [驗證流程詳解](#驗證流程詳解)
 - [角色與權限對照表](#角色與權限對照表)
@@ -18,6 +21,88 @@
 - [快速開始](#快速開始)
 - [安全設計決策](#安全設計決策)
 - [環境變數說明](#環境變數說明)
+
+---
+
+## GitHub Codespaces 快速啟動
+
+### 一鍵開啟
+
+點擊上方 **Open in GitHub Codespaces** 徽章，或至 GitHub 儲存庫頁面按下 `Code → Codespaces → Create codespace on main`。
+
+### 自動化流程
+
+Codespace 建立後會自動執行以下步驟：
+
+```
+1. 啟動三個容器（docker-compose.codespace.yml）
+   ├── postgres:16-alpine      ← Keycloak 資料庫
+   ├── quay.io/keycloak:24.0   ← 身份提供者（port 8080）
+   └── node:20-alpine          ← Next.js 開發容器（port 3000）
+
+2. postCreateCommand → .devcontainer/setup.sh
+   ├── 偵測 Codespace 動態 URL（CODESPACE_NAME 環境變數）
+   ├── 自動產生 SESSION_SECRET（32 bytes 隨機值）
+   ├── 建立 .env.local（含正確的 KEYCLOAK_URL 與 NEXTJS_URL）
+   └── npm install
+
+3. postStartCommand → npm run dev
+   └── Next.js 開發伺服器自動啟動於 port 3000
+```
+
+### 連線資訊
+
+| 服務 | Codespace 網址 | 說明 |
+|---|---|---|
+| **Next.js App** | `https://{codespace-name}-3000.app.github.dev` | 主應用程式（自動在瀏覽器開啟） |
+| **Keycloak Admin** | `https://{codespace-name}-8080.app.github.dev/admin` | 身份管理後台 |
+
+> Codespace 名稱可在 VS Code 左下角或 GitHub Codespaces 頁面查看。
+
+### 預設測試帳號
+
+開發用 Realm（`keycloak-realm-config.dev.json`）已預建以下帳號：
+
+| 帳號 | 密碼 | 角色 | 可存取頁面 |
+|---|---|---|---|
+| `admin-user` | `Admin1234!` | admin | /dashboard、/admin |
+| `doctor-user` | `Doctor1234!` | doctor | /dashboard |
+| `nurse-user` | `Nurse1234!` | nurse | /dashboard |
+| `viewer-user` | `Viewer1234!` | viewer | /dashboard |
+
+### Keycloak Admin 後台
+
+| 項目 | 值 |
+|---|---|
+| 網址 | `https://{codespace-name}-8080.app.github.dev/admin` |
+| 帳號 | `admin` |
+| 密碼 | `devpassword123` |
+
+> ⚠️ Keycloak 首次啟動需 **30～60 秒**，請等待後再嘗試登入。
+
+### Devcontainer 檔案說明
+
+```
+.devcontainer/
+├── devcontainer.json              # Codespaces 主設定
+├── docker-compose.codespace.yml   # 開發用 compose（獨立，不依賴生產設定）
+└── setup.sh                       # postCreateCommand：偵測 URL、建立 env、npm install
+
+k8s/
+├── keycloak-realm-config.json     # 生產用 Realm 設定（嚴格 redirect URI）
+└── keycloak-realm-config.dev.json # 開發用 Realm 設定（含測試帳號、寬鬆 redirect）
+```
+
+### 開發 vs 生產設定差異
+
+| 項目 | 開發（Codespaces） | 生產（K8s） |
+|---|---|---|
+| Realm 設定 | `keycloak-realm-config.dev.json` | `keycloak-realm-config.json` |
+| Client Secret | `dev-secret-not-for-production` | Kubernetes Secret |
+| Redirect URI | `https://*.app.github.dev/*` + `localhost` | 固定生產 URL |
+| sslRequired | `none` | `external` |
+| 測試帳號 | 已預建 4 個 | 手動建立 |
+| SESSION_SECRET | setup.sh 自動產生 | Kubernetes Secret |
 
 ---
 

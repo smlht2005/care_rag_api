@@ -1,0 +1,40 @@
+{
+  "name": "Next.js + Keycloak RBAC",
+  "dockerComposeFile": "docker-compose.codespace.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+
+  "forwardPorts": [3000, 8080],
+  "portsAttributes": {
+    "3000": {
+      "label": "Next.js App",
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
+    },
+    "8080": {
+      "label": "Keycloak Admin",
+      "onAutoForward": "notify",
+      "visibility": "public"
+    }
+  },
+
+  "postCreateCommand": "bash /workspace/.devcontainer/setup.sh",
+  "postStartCommand": "cd /workspace && npm run dev",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker",
+        "pflannery.vscode-versionlens"
+      ],
+      "settings": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "typescript.tsdk": "node_modules/typescript/lib"
+      }
+    }
+  }
+}
