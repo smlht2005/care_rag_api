@@ -1,0 +1,103 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hospital
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nextjs-rbac-secrets
+  namespace: hospital
+type: Opaque
+stringData:
+  keycloak-client-secret: "<REPLACE>"
+  session-secret: "<REPLACE-32-CHARS-MIN>"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nextjs-rbac
+  namespace: hospital
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nextjs-rbac
+  template:
+    metadata:
+      labels:
+        app: nextjs-rbac
+    spec:
+      containers:
+        - name: nextjs
+          image: hospital/nextjs-rbac:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: KEYCLOAK_URL
+              value: "https://keycloak.hospital.internal"
+            - name: KEYCLOAK_REALM
+              value: "hospital"
+            - name: KEYCLOAK_CLIENT_ID
+              value: "nextjs-bff"
+            - name: NEXTJS_URL
+              value: "https://his.hospital.internal"
+            - name: PATIENT_SERVICE_URL
+              value: "http://patient-service.hospital.svc.cluster.local:8081"
+            - name: ADMIN_SERVICE_URL
+              value: "http://admin-service.hospital.svc.cluster.local:8082"
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nextjs-rbac-secrets
+                  key: keycloak-client-secret
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: nextjs-rbac-secrets
+                  key: session-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nextjs-rbac
+  namespace: hospital
+spec:
+  selector:
+    app: nextjs-rbac
+  ports:
+    - port: 80
+      targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nextjs-rbac
+  namespace: hospital
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - his.hospital.internal
+      secretName: hospital-tls
+  rules:
+    - host: his.hospital.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nextjs-rbac
+                port:
+                  number: 80
